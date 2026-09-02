@@ -5,11 +5,13 @@ export function SiteFooter() {
     <footer className="mk-footer">
       <div className="mk-wrap mk-footer-inner">
         <div>
-          <Link className="mk-brand" href="/">stashi<span>.</span></Link>
-          <p>Managed PostgreSQL with fixed monthly plans.</p>
+          <Link className="mk-brand" href="/" aria-label="Stashi home">
+            stashi<span>.</span>
+          </Link>
+          <p>Low-cost, agentic-tuned managed PostgreSQL with fixed monthly pricing from $1 a month.</p>
         </div>
         <div className="mk-footer-links">
-          <Link href="/product">Product</Link>
+          <Link href="/#agentic">Agentic Workflows</Link>
           <Link href="/pricing">Pricing</Link>
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>

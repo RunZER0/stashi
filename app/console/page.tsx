@@ -1,9 +1,20 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { listActivity, listDatabases, listNodes } from "@/lib/store";
 import ConsoleClient from "./console-client";
 
 export default async function ConsolePage() {
   const session = (await cookies()).get("stashi_session")?.value;
   if (!session) redirect("/login");
-  return <ConsoleClient email={session}/>;
+  const databases = listDatabases(session);
+  const activity = listActivity(session);
+  const [primaryNode] = listNodes();
+  return (
+    <ConsoleClient
+      email={session}
+      initialDatabases={databases}
+      initialActivity={activity}
+      primaryNode={primaryNode}
+    />
+  );
 }

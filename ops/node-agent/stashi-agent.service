@@ -1,0 +1,29 @@
+[Unit]
+Description=Stashi PostgreSQL Node Agent
+After=network.target postgresql@17-main.service pgbouncer.service
+Wants=postgresql@17-main.service pgbouncer.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/stashi-agent
+EnvironmentFile=-/etc/stashi/agent.env
+ExecStart=/usr/bin/node /opt/stashi-agent/agent.js
+Restart=always
+RestartSec=5s
+
+# Security Hardening
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+MemoryHigh=150M
+MemoryMax=250M
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=stashi-agent
+
+[Install]
+WantedBy=multi-user.target
