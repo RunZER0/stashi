@@ -1,38 +1,61 @@
-# Stashi MVP architecture
+# Stashi architecture
 
-Stashi is intentionally a thin managed-PostgreSQL control plane, not a new database engine.
+## Database node
 
-## Data plane
+Each node runs PostgreSQL 17 and PgBouncer. PostgreSQL listens on a private interface. PgBouncer accepts client connections over TLS.
 
-Each node runs PostgreSQL 17 and PgBouncer. PostgreSQL listens privately; PgBouncer is the client-facing endpoint and requires TLS. Small plans share nodes using separate databases, roles, quotas, and monitored connection pools. Dedicated plans move onto isolated nodes without changing the customer workflow.
+Shared plans use separate PostgreSQL databases and roles on the same node. Dedicated plans reserve node capacity for one customer.
 
 ## Control plane
 
-The web application owns customer identity, plan selection, database metadata, quotas, audit events, billing state, job state, node inventory, and backup metadata. Provisioning is asynchronous in production:
+The web application stores:
 
-1. Validate account and plan quota.
-2. Select an eligible node from telemetry and declared limits.
-3. Create a random database role and database.
-4. Apply scoped grants and extensions allowed by the plan.
-5. Register PgBouncer routing/auth and enforce TLS.
-6. Create backup + monitoring targets.
-7. Probe the returned connection string.
-8. Mark the database healthy and reveal credentials.
+- customer and account records
+- plan and billing state
+- database metadata and credentials references
+- quotas
+- node inventory and capacity snapshots
+- provisioning job state
+- backup metadata
+- audit events
 
-The current MVP exposes the same API/UX boundary with a simulated provisioner so the product can be exercised before the node agent is introduced.
+Provisioning runs as a background job. A create-database job validates the request, selects an eligible node, creates the PostgreSQL role and database, applies plan configuration, updates PgBouncer authentication, probes the connection and records the result.
+
+The current application uses a simulated provisioner behind the same API boundary.
 
 ## Placement
 
-A simple scheduler is enough initially. Keep nodes eligible while sustained CPU is below 60%, memory below 75%, disk below 70%, and database/customer quotas remain available. Prefer the lowest-pressure compatible node. Do not upgrade a node merely because a larger plan exists; upgrade only when telemetry proves pressure.
+The scheduler evaluates declared node capacity and recent telemetry. Initial placement thresholds are:
+
+- sustained CPU below 60%
+- memory utilization below 75%
+- disk utilization below 70%
+- available customer and connection quota
+
+Thresholds are configuration, not product promises. Capacity data should be retained so node upgrades can be tied to observed pressure.
 
 ## Backups
 
-Production backups should be custom-format `pg_dump` snapshots or physical/WAL backups depending on plan maturity, copied off-node to S3-compatible storage such as R2, verified after upload, and rotated by retention policy. The restore job must create a new database/restore target before destructive replacement whenever possible.
+The first backup implementation uses PostgreSQL custom-format dumps copied to S3-compatible object storage. Each upload is verified before local cleanup. Retention is set by plan.
 
-## Billing model
+Later tiers may use physical backups and WAL archiving when recovery-point requirements justify the extra operational cost.
 
-Plans are fixed-price objects. Usage metrics exist to enforce limits and recommend plan changes, not to calculate surprise compute bills. A plan change is an explicit customer action.
+## Provisioner interface
 
-## Next infrastructure milestone
+The node agent needs authenticated commands for:
 
-Build a small node agent/provisioner with a signed control-plane API. It should support create database, rotate credentials, suspend/resume, delete, health probe, backup, restore, metrics snapshot, and capacity report. No Kubernetes dependency is required for the first multi-node version.
+- create database and role
+- rotate credentials
+- suspend or resume access
+- delete database
+- run health probe
+- create backup
+- restore backup
+- report database metrics
+- report node capacity
+
+Control-plane requests should be idempotent. Jobs need durable states so retries do not create duplicate roles, databases or restore targets.
+
+## Billing
+
+Plans are fixed-price records with explicit storage, connection and retention limits. Usage metrics enforce those limits and support capacity planning. Billing does not derive a variable compute charge from runtime telemetry.
