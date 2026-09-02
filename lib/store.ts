@@ -1,92 +1,15 @@
-import fs from "node:fs";
-import path from "node:path";
 import { randomBytes } from "node:crypto";
+import { ensureSchema, getPool } from "./db";
 import type { ActivityEntry, AgentJob, AgentJobStatus, ManagedDatabase, Node } from "./control-plane";
 import type { PlanId } from "./plans";
 
-// Lightweight file-backed persistence for the control plane. There is no real
-// control-plane database yet (see the productionize-node handover issue), so
-// this is the honest replacement for the in-memory demo arrays and the
-// in-memory job queue: real create/read/update/delete that survives a page
-// refresh and a server restart, without inventing telemetry that isn't
-// actually being collected, and without pretending a database is "healthy"
-// before the node agent has actually created it.
+// Real Postgres-backed control plane. See lib/db.ts for why: this used to be
+// a JSON file on local disk, which only worked as a stopgap — it doesn't
+// survive a redeploy on a host without a persistent disk, and disks cost
+// extra. There's already a real, paid-for Postgres server (the same VPS that
+// runs customer databases) sitting idle for this purpose.
 
-type StoreShape = {
-  users: Record<string, { email: string; firstSeenAt: string }>;
-  databasesByUser: Record<string, ManagedDatabase[]>;
-  activityByUser: Record<string, ActivityEntry[]>;
-  nodes: Node[];
-  jobs: AgentJob[];
-};
-
-const DATA_DIR = path.join(process.cwd(), ".data");
-const STORE_PATH = path.join(DATA_DIR, "store.json");
-
-function defaultStore(): StoreShape {
-  return {
-    users: {},
-    databasesByUser: {},
-    activityByUser: {},
-    nodes: [
-      {
-        id: "node-nj-01",
-        label: "NJ · 01",
-        region: "New Jersey, US",
-        cpuPct: null,
-        memoryPct: null,
-        diskPct: null,
-        databaseCount: 0,
-        capacityStatus: "pending",
-        lastHeartbeat: null,
-      },
-    ],
-    jobs: [],
-  };
-}
-
-function readStore(): StoreShape {
-  try {
-    const raw = fs.readFileSync(STORE_PATH, "utf8");
-    const parsed = JSON.parse(raw) as Partial<StoreShape>;
-    return { ...defaultStore(), ...parsed };
-  } catch {
-    return defaultStore();
-  }
-}
-
-function writeStore(store: StoreShape) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
-}
-
-function pushActivity(store: StoreShape, email: string, actor: string, action: string, target: string) {
-  const entry: ActivityEntry = {
-    id: `ev_${Date.now().toString(36)}${randomBytes(2).toString("hex")}`,
-    actor,
-    action,
-    target,
-    createdAt: new Date().toISOString(),
-  };
-  const list = store.activityByUser[email] ?? [];
-  store.activityByUser[email] = [entry, ...list].slice(0, 100);
-}
-
-export function recordUserSeen(email: string) {
-  const store = readStore();
-  if (!store.users[email]) {
-    store.users[email] = { email, firstSeenAt: new Date().toISOString() };
-    writeStore(store);
-  }
-}
-
-export function listDatabases(email: string): ManagedDatabase[] {
-  return readStore().databasesByUser[email] ?? [];
-}
-
-export function getDatabase(email: string, id: string): ManagedDatabase | null {
-  return listDatabases(email).find((db) => db.id === id) ?? null;
-}
+const DEFAULT_NODE_ID = "node-nj-01";
 
 const slugify = (value: string) =>
   value
@@ -95,204 +18,340 @@ const slugify = (value: string) =>
     .replace(/^_|_$/g, "")
     .slice(0, 32) || "database";
 
-const DEFAULT_NODE_ID = "node-nj-01";
+function rowToDatabase(row: any): ManagedDatabase {
+  return {
+    id: row.id,
+    name: row.name,
+    plan: row.plan,
+    region: row.region,
+    status: row.status,
+    version: row.version,
+    host: row.host,
+    port: row.port,
+    database: row.database_name,
+    username: row.username,
+    password: row.password,
+    apiKey: row.api_key,
+    createdAt: row.created_at.toISOString(),
+    storageUsedMb: row.storage_used_mb,
+    connections: row.connections,
+    p95LatencyMs: row.p95_latency_ms,
+  };
+}
+
+function rowToActivity(row: any): ActivityEntry {
+  return {
+    id: row.id,
+    actor: row.actor,
+    action: row.action,
+    target: row.target,
+    createdAt: row.created_at.toISOString(),
+  };
+}
+
+function rowToNode(row: any): Node {
+  return {
+    id: row.id,
+    label: row.label,
+    region: row.region,
+    cpuPct: row.cpu_pct,
+    memoryPct: row.memory_pct,
+    diskPct: row.disk_pct,
+    databaseCount: row.database_count,
+    capacityStatus: row.capacity_status,
+    lastHeartbeat: row.last_heartbeat ? row.last_heartbeat.toISOString() : null,
+  };
+}
+
+function rowToJob(row: any): AgentJob {
+  return {
+    id: row.id,
+    nodeId: row.node_id,
+    type: row.type,
+    payload: row.payload,
+    status: row.status,
+    ownerEmail: row.owner_email,
+    databaseId: row.database_id,
+    createdAt: row.created_at.toISOString(),
+    result: row.result ?? undefined,
+    error: row.error ?? undefined,
+  };
+}
+
+const newId = (prefix: string) => `${prefix}_${Date.now().toString(36)}${randomBytes(3).toString("hex")}`;
+
+async function pushActivity(email: string, actor: string, action: string, target: string) {
+  await getPool().query(
+    `INSERT INTO activity (id, owner_email, actor, action, target) VALUES ($1,$2,$3,$4,$5)`,
+    [newId("ev"), email, actor, action, target]
+  );
+}
+
+export async function recordUserSeen(email: string) {
+  await ensureSchema();
+  await getPool().query(`INSERT INTO users (email) VALUES ($1) ON CONFLICT (email) DO NOTHING`, [email]);
+}
+
+export async function listDatabases(email: string): Promise<ManagedDatabase[]> {
+  await ensureSchema();
+  const { rows } = await getPool().query(`SELECT * FROM databases WHERE owner_email = $1 ORDER BY created_at DESC`, [
+    email,
+  ]);
+  return rows.map(rowToDatabase);
+}
+
+export async function getDatabase(email: string, id: string): Promise<ManagedDatabase | null> {
+  await ensureSchema();
+  const { rows } = await getPool().query(`SELECT * FROM databases WHERE owner_email = $1 AND id = $2`, [email, id]);
+  return rows[0] ? rowToDatabase(rows[0]) : null;
+}
 
 // Creates the database record in "provisioning" state and enqueues the real
 // job for the node agent to execute. The record only flips to "healthy" once
 // completeJob() processes a successful create_database result — see
 // app/api/agent/jobs/complete/route.ts.
-export function createDatabase(
+export async function createDatabase(
   email: string,
   input: { name: string; plan: PlanId; region: string }
-): { database: ManagedDatabase; job: AgentJob } {
-  const store = readStore();
+): Promise<{ database: ManagedDatabase; job: AgentJob }> {
+  await ensureSchema();
+  const pool = getPool();
+  await pool.query(`INSERT INTO users (email) VALUES ($1) ON CONFLICT (email) DO NOTHING`, [email]);
+
   const safeName = slugify(input.name);
   const suffix = randomBytes(3).toString("hex");
   const roleName = `st_${safeName}_${suffix}`;
   const dbName = `st_${safeName}_${suffix}`;
   const password = `st_${randomBytes(12).toString("base64url")}`;
+  const id = newId("db").toUpperCase();
+  const apiKey = `st_live_${randomBytes(9).toString("hex")}`;
+  const host = process.env.NEXT_PUBLIC_DB_HOST || "db.stashi.dev";
+  const port = Number(process.env.NEXT_PUBLIC_DB_PORT || 6432);
+  const name = input.name.trim() || "database";
 
-  const record: ManagedDatabase = {
-    id: `db_${Date.now().toString(36)}${randomBytes(3).toString("hex")}`.toUpperCase(),
-    name: input.name.trim() || "database",
-    plan: input.plan,
-    region: input.region || "us-east",
-    status: "provisioning",
-    version: "17",
-    host: process.env.NEXT_PUBLIC_DB_HOST || "db.stashi.dev",
-    port: Number(process.env.NEXT_PUBLIC_DB_PORT || 6432),
-    database: dbName,
-    username: roleName,
-    password,
-    apiKey: `st_live_${randomBytes(9).toString("hex")}`,
-    createdAt: new Date().toISOString(),
-    storageUsedMb: 0,
-    connections: 0,
-    p95LatencyMs: null,
-  };
+  await pool.query(
+    `INSERT INTO databases (id, owner_email, name, plan, region, status, version, host, port, database_name, username, password, api_key)
+     VALUES ($1,$2,$3,$4,$5,'provisioning','17',$6,$7,$8,$9,$10,$11)`,
+    [id, email, name, input.plan, input.region || "us-east", host, port, dbName, roleName, password, apiKey]
+  );
 
-  const job: AgentJob = {
-    id: `job_${Date.now().toString(36)}${randomBytes(3).toString("hex")}`,
-    nodeId: DEFAULT_NODE_ID,
-    type: "create_database",
-    payload: { database_name: dbName, role_name: roleName, password, connection_limit: 10 },
-    status: "pending",
-    ownerEmail: email,
-    databaseId: record.id,
-    createdAt: new Date().toISOString(),
-  };
+  const jobId = newId("job");
+  const payload = { database_name: dbName, role_name: roleName, password, connection_limit: 10 };
+  await pool.query(
+    `INSERT INTO jobs (id, node_id, type, payload, status, owner_email, database_id)
+     VALUES ($1,$2,'create_database',$3,'pending',$4,$5)`,
+    [jobId, DEFAULT_NODE_ID, JSON.stringify(payload), email, id]
+  );
 
-  store.databasesByUser[email] = [record, ...(store.databasesByUser[email] ?? [])];
-  store.jobs.push(job);
-  pushActivity(store, email, "you", "database.provisioning.queued", record.name);
-  writeStore(store);
-  return { database: record, job };
+  await pushActivity(email, "you", "database.provisioning.queued", name);
+
+  const database = (await getDatabase(email, id))!;
+  const { rows } = await pool.query(`SELECT * FROM jobs WHERE id = $1`, [jobId]);
+  return { database, job: rowToJob(rows[0]) };
 }
 
-export function updateDatabase(
+export async function updateDatabase(
   email: string,
   id: string,
   patch: Partial<ManagedDatabase>
-): ManagedDatabase | null {
-  const store = readStore();
-  const list = store.databasesByUser[email] ?? [];
-  const index = list.findIndex((db) => db.id === id);
-  if (index === -1) return null;
-  const updated = { ...list[index], ...patch };
-  list[index] = updated;
-  store.databasesByUser[email] = list;
-  writeStore(store);
-  return updated;
+): Promise<ManagedDatabase | null> {
+  await ensureSchema();
+  const columnMap: Record<string, string> = {
+    status: "status",
+    password: "password",
+    storageUsedMb: "storage_used_mb",
+    connections: "connections",
+    p95LatencyMs: "p95_latency_ms",
+  };
+  const sets: string[] = [];
+  const values: unknown[] = [];
+  for (const [key, column] of Object.entries(columnMap)) {
+    if (key in patch) {
+      values.push((patch as any)[key]);
+      sets.push(`${column} = $${values.length}`);
+    }
+  }
+  if (sets.length === 0) return getDatabase(email, id);
+
+  values.push(email, id);
+  const { rows } = await getPool().query(
+    `UPDATE databases SET ${sets.join(", ")} WHERE owner_email = $${values.length - 1} AND id = $${values.length} RETURNING *`,
+    values
+  );
+  return rows[0] ? rowToDatabase(rows[0]) : null;
 }
 
-export function deleteDatabase(email: string, id: string): ManagedDatabase | null {
-  const store = readStore();
-  const list = store.databasesByUser[email] ?? [];
-  const target = list.find((db) => db.id === id);
+export async function deleteDatabase(email: string, id: string): Promise<ManagedDatabase | null> {
+  await ensureSchema();
+  const pool = getPool();
+  const { rows } = await pool.query(`DELETE FROM databases WHERE owner_email = $1 AND id = $2 RETURNING *`, [
+    email,
+    id,
+  ]);
+  const target = rows[0] ? rowToDatabase(rows[0]) : null;
   if (!target) return null;
-  store.databasesByUser[email] = list.filter((db) => db.id !== id);
 
-  const job: AgentJob = {
-    id: `job_${Date.now().toString(36)}${randomBytes(3).toString("hex")}`,
-    nodeId: DEFAULT_NODE_ID,
-    type: "delete_database",
-    payload: { database_name: target.database, role_name: target.username },
-    status: "pending",
-    ownerEmail: email,
-    databaseId: target.id,
-    createdAt: new Date().toISOString(),
-  };
-  store.jobs.push(job);
-  pushActivity(store, email, "you", "database.deleted", target.name);
-  writeStore(store);
+  await pool.query(
+    `INSERT INTO jobs (id, node_id, type, payload, status, owner_email, database_id)
+     VALUES ($1,$2,'delete_database',$3,'pending',$4,$5)`,
+    [newId("job"), DEFAULT_NODE_ID, JSON.stringify({ database_name: target.database, role_name: target.username }), email, id]
+  );
+  await pushActivity(email, "you", "database.deleted", target.name);
   return target;
 }
 
-export function listActivity(email: string): ActivityEntry[] {
-  return readStore().activityByUser[email] ?? [];
+export async function listActivity(email: string): Promise<ActivityEntry[]> {
+  await ensureSchema();
+  const { rows } = await getPool().query(
+    `SELECT * FROM activity WHERE owner_email = $1 ORDER BY created_at DESC LIMIT 100`,
+    [email]
+  );
+  return rows.map(rowToActivity);
 }
 
-export function recordActivity(email: string, actor: string, action: string, target: string) {
-  const store = readStore();
-  pushActivity(store, email, actor, action, target);
-  writeStore(store);
+export async function recordActivity(email: string, actor: string, action: string, target: string) {
+  await ensureSchema();
+  await pushActivity(email, actor, action, target);
 }
 
-export function listNodes(): Node[] {
-  return readStore().nodes;
+export async function listNodes(): Promise<Node[]> {
+  await ensureSchema();
+  const { rows } = await getPool().query(`SELECT * FROM nodes ORDER BY id`);
+  return rows.map(rowToNode);
 }
 
-export function recordNodeTelemetry(nodeId: string, patch: Partial<Node>) {
-  const store = readStore();
-  const node = store.nodes.find((n) => n.id === nodeId);
-  if (!node) return null;
-  Object.assign(node, patch, { lastHeartbeat: new Date().toISOString() });
-  writeStore(store);
-  return node;
+export async function recordNodeTelemetry(nodeId: string, patch: Partial<Node>) {
+  await ensureSchema();
+  const columnMap: Record<string, string> = {
+    cpuPct: "cpu_pct",
+    memoryPct: "memory_pct",
+    diskPct: "disk_pct",
+    databaseCount: "database_count",
+    capacityStatus: "capacity_status",
+  };
+  const sets: string[] = ["last_heartbeat = now()"];
+  const values: unknown[] = [];
+  for (const [key, column] of Object.entries(columnMap)) {
+    if (key in patch) {
+      values.push((patch as any)[key]);
+      sets.push(`${column} = $${values.length}`);
+    }
+  }
+  values.push(nodeId);
+  const { rows } = await getPool().query(
+    `UPDATE nodes SET ${sets.join(", ")} WHERE id = $${values.length} RETURNING *`,
+    values
+  );
+  return rows[0] ? rowToNode(rows[0]) : null;
 }
 
 // --- Agent job queue -------------------------------------------------------
 
-export function enqueueJob(
+export async function enqueueJob(
   nodeId: string,
   type: string,
   payload: Record<string, unknown>,
   ownerEmail: string,
   databaseId: string
-): AgentJob {
-  const store = readStore();
-  const job: AgentJob = {
-    id: `job_${Date.now().toString(36)}${randomBytes(3).toString("hex")}`,
-    nodeId,
-    type,
-    payload,
-    status: "pending",
-    ownerEmail,
-    databaseId,
-    createdAt: new Date().toISOString(),
-  };
-  store.jobs.push(job);
-  writeStore(store);
-  return job;
+): Promise<AgentJob> {
+  await ensureSchema();
+  const id = newId("job");
+  const { rows } = await getPool().query(
+    `INSERT INTO jobs (id, node_id, type, payload, status, owner_email, database_id)
+     VALUES ($1,$2,$3,$4,'pending',$5,$6) RETURNING *`,
+    [id, nodeId, type, JSON.stringify(payload), ownerEmail, databaseId]
+  );
+  return rowToJob(rows[0]);
 }
 
-// Claims the oldest pending job for a node (or unassigned) and marks it running.
-export function claimNextJob(nodeId: string): AgentJob | null {
-  const store = readStore();
-  const job = store.jobs.find((j) => j.status === "pending" && (!j.nodeId || j.nodeId === nodeId));
-  if (!job) return null;
-  job.status = "running";
-  writeStore(store);
-  return job;
+// Atomically claims the oldest pending job for a node (or unassigned) using
+// SKIP LOCKED, so concurrent agent polls never double-claim the same job.
+export async function claimNextJob(nodeId: string): Promise<AgentJob | null> {
+  await ensureSchema();
+  const { rows } = await getPool().query(
+    `UPDATE jobs SET status = 'running'
+     WHERE id = (
+       SELECT id FROM jobs
+       WHERE status = 'pending' AND (node_id = $1 OR node_id IS NULL OR node_id = '')
+       ORDER BY created_at ASC
+       LIMIT 1
+       FOR UPDATE SKIP LOCKED
+     )
+     RETURNING *`,
+    [nodeId]
+  );
+  return rows[0] ? rowToJob(rows[0]) : null;
 }
 
-export function completeJob(
+export async function completeJob(
   jobId: string,
   status: AgentJobStatus,
   result?: Record<string, unknown>,
   error?: string
-): AgentJob | null {
-  const store = readStore();
-  const job = store.jobs.find((j) => j.id === jobId);
+): Promise<AgentJob | null> {
+  await ensureSchema();
+  const pool = getPool();
+  const { rows } = await pool.query(
+    `UPDATE jobs SET status = $2, result = COALESCE($3, result), error = COALESCE($4, error)
+     WHERE id = $1 RETURNING *`,
+    [jobId, status, result ? JSON.stringify(result) : null, error ?? null]
+  );
+  const job = rows[0] ? rowToJob(rows[0]) : null;
   if (!job) return null;
-  job.status = status;
-  if (result) job.result = result;
-  if (error) job.error = error;
 
-  // Reflect the real outcome onto the owning database record.
-  const list = store.databasesByUser[job.ownerEmail] ?? [];
-  const db = list.find((d) => d.id === job.databaseId);
-  if (db) {
-    if (job.type === "create_database") {
-      db.status = status === "completed" ? "healthy" : "failed";
-    }
-    pushActivity(
-      store,
+  if (job.type === "create_database") {
+    await pool.query(`UPDATE databases SET status = $3 WHERE owner_email = $1 AND id = $2`, [
+      job.ownerEmail,
+      job.databaseId,
+      status === "completed" ? "healthy" : "failed",
+    ]);
+  }
+
+  const { rows: dbRows } = await pool.query(`SELECT name FROM databases WHERE owner_email = $1 AND id = $2`, [
+    job.ownerEmail,
+    job.databaseId,
+  ]);
+  const targetName = dbRows[0]?.name;
+  if (targetName) {
+    await pushActivity(
       job.ownerEmail,
       "node-agent",
       status === "completed" ? `${job.type}.completed` : `${job.type}.failed`,
-      db.name
+      targetName
     );
   }
-  store.databasesByUser[job.ownerEmail] = list;
 
-  writeStore(store);
   return job;
 }
 
-export function adminSummary() {
-  const store = readStore();
-  const workspaces = Object.keys(store.users).map((email) => {
-    const databases = store.databasesByUser[email] ?? [];
-    return { email, databases };
-  });
-  const totalDatabases = workspaces.reduce((sum, w) => sum + w.databases.length, 0);
-  const pendingJobs = store.jobs.filter((j) => j.status === "pending" || j.status === "running").length;
+export async function adminSummary() {
+  await ensureSchema();
+  const pool = getPool();
+  const [{ rows: userRows }, { rows: dbRows }, { rows: nodeRows }, { rows: jobRows }] = await Promise.all([
+    pool.query(`SELECT email FROM users ORDER BY first_seen_at`),
+    pool.query(`SELECT * FROM databases`),
+    pool.query(`SELECT * FROM nodes ORDER BY id`),
+    pool.query(`SELECT count(*)::int AS count FROM jobs WHERE status IN ('pending','running')`),
+  ]);
+
+  const databasesByUser = new Map<string, ManagedDatabase[]>();
+  for (const row of dbRows) {
+    const db = rowToDatabase(row);
+    const list = databasesByUser.get(row.owner_email) ?? [];
+    list.push(db);
+    databasesByUser.set(row.owner_email, list);
+  }
+
+  const workspaces = userRows.map((u: any) => ({
+    email: u.email as string,
+    databases: databasesByUser.get(u.email) ?? [],
+  }));
+
   return {
     workspaceCount: workspaces.length,
-    totalDatabases,
-    nodes: store.nodes,
+    totalDatabases: dbRows.length,
+    nodes: nodeRows.map(rowToNode),
     workspaces,
-    pendingJobs,
+    pendingJobs: jobRows[0]?.count ?? 0,
   };
 }

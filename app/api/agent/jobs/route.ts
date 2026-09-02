@@ -11,7 +11,7 @@ export async function POST(req: Request) {
 
   try {
     const { nodeId } = JSON.parse(rawBody || "{}") as { nodeId?: string };
-    const job = claimNextJob(nodeId || "");
+    const job = await claimNextJob(nodeId || "");
     return NextResponse.json({ job });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

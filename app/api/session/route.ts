@@ -6,7 +6,7 @@ export async function POST(request: Request) {
   const email = String(form.get("email") ?? "").trim();
   if (!email || !email.includes("@")) return NextResponse.redirect(new URL("/login", request.url), 303);
 
-  recordUserSeen(email);
+  await recordUserSeen(email);
 
   const response = NextResponse.redirect(new URL("/console", request.url), 303);
   response.cookies.set("stashi_session", email, {

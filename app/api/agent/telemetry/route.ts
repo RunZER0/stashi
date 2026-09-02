@@ -30,7 +30,7 @@ export async function POST(req: Request) {
       patch.capacityStatus = cpuPct > 70 || memoryPct > 80 ? "watch" : "open";
     }
 
-    recordNodeTelemetry(nodeId, patch);
+    await recordNodeTelemetry(nodeId, patch);
 
     return NextResponse.json({ success: true, recordedAt: new Date().toISOString() });
   } catch (err: any) {

@@ -9,7 +9,7 @@ export default async function AdminPage() {
   const session = (await cookies()).get("stashi_session")?.value;
   if (!session) redirect("/login");
 
-  const summary = adminSummary();
+  const summary = await adminSummary();
   const fixedMrr = summary.workspaces.reduce(
     (sum, w) => sum + w.databases.reduce((s, db) => s + (getPlan(db.plan).price ?? 9), 0),
     0

@@ -2,7 +2,7 @@ services:
   - type: web
     name: stashi-control-plane
     runtime: node
-    plan: starter
+    plan: free
     region: oregon
     buildCommand: npm install && npm run build
     startCommand: npm run start
@@ -14,6 +14,8 @@ services:
         sync: false
       - key: NEXT_PUBLIC_DB_PORT
         sync: false
+      - key: CONTROL_PLANE_DATABASE_URL
+        sync: false
       - key: STASHI_AGENT_SHARED_SECRET
         sync: false
       - key: R2_ENDPOINT
@@ -24,7 +26,3 @@ services:
         sync: false
       - key: BACKUP_BUCKET
         sync: false
-    disk:
-      name: stashi-data
-      mountPath: /opt/render/project/src/.data
-      sizeGB: 1

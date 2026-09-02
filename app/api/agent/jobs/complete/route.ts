@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     if (!jobId || !status) {
       return NextResponse.json({ error: "jobId and status are required" }, { status: 400 });
     }
-    const job = completeJob(jobId, status, result, error);
+    const job = await completeJob(jobId, status, result, error);
     if (!job) return NextResponse.json({ error: "not_found" }, { status: 404 });
     return NextResponse.json({ success: true, jobId, status });
   } catch (err: any) {

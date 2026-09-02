@@ -9,8 +9,10 @@
     "check": "tsc --noEmit"
   },
   "dependencies": {
+    "@types/pg": "^8.23.1",
     "lucide-react": "^0.468.0",
     "next": "^15.5.2",
+    "pg": "^8.23.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },

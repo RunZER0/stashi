@@ -9,9 +9,9 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const { id } = await context.params;
   const body = (await request.json().catch(() => ({}))) as { suspended?: boolean };
   const status = body.suspended === false ? "healthy" : "suspended";
-  const updated = updateDatabase(email, id, { status });
+  const updated = await updateDatabase(email, id, { status });
   if (!updated) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
-  recordActivity(email, "you", status === "suspended" ? "database.suspended" : "database.resumed", updated.name);
+  await recordActivity(email, "you", status === "suspended" ? "database.suspended" : "database.resumed", updated.name);
   return NextResponse.json({ id, status });
 }
