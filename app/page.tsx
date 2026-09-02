@@ -1,138 +1,106 @@
 import Link from "next/link";
-import { ArrowRight, Check, Database, Gauge, LockKeyhole, Terminal, Waves } from "lucide-react";
-import { plans } from "@/lib/plans";
-
-const proofRows = [
-  ["payments-api", "Healthy", "842 MB", "38 ms"],
-  ["student-portal", "Healthy", "126 MB", "24 ms"],
-  ["inventory", "Healthy", "2.4 GB", "41 ms"],
-];
+import { ArrowRight } from "lucide-react";
+import { SiteHeader } from "@/components/site-header";
+import { SiteFooter } from "@/components/site-footer";
 
 export default function Home() {
   return (
-    <main className="site-shell">
-      <header className="topbar wrap">
-        <Link className="brand" href="/">stashi<span className="brand-dot">.</span></Link>
-        <nav className="nav-links" aria-label="Primary navigation">
-          <a href="#product">Product</a>
-          <a href="#pricing">Pricing</a>
-          <a href="#architecture">Architecture</a>
-        </nav>
-        <div className="top-actions">
-          <Link className="text-link" href="/login">Sign in</Link>
-          <Link className="button button-dark button-compact" href="/login">Create database <ArrowRight size={15}/></Link>
-        </div>
-      </header>
+    <main className="mk-shell">
+      <SiteHeader />
 
-      <section className="hero wrap">
-        <div className="hero-copy">
-          <div className="eyebrow"><span className="status-dot"/> Managed PostgreSQL · fixed monthly price</div>
-          <h1>Postgres that costs what the label says.</h1>
-          <p className="hero-lede">Production-ready PostgreSQL with TLS, pooling, backups and health monitoring. Start at $1. No compute-unit math. No surprise bill.</p>
-          <div className="hero-actions">
-            <Link className="button button-dark" href="/login">Create a database <ArrowRight size={16}/></Link>
-            <a className="button button-ghost" href="#pricing">See pricing</a>
+      <section className="mk-wrap mk-hero">
+        <div className="mk-hero-copy">
+          <span className="mk-kicker">Managed PostgreSQL</span>
+          <h1>A production Postgres database from $1 a month.</h1>
+          <p>Create a database and get a TLS connection string in seconds. Every plan has a fixed monthly price and limits you can see before you deploy.</p>
+          <div className="mk-hero-actions">
+            <Link className="mk-button mk-button-dark" href="/login">Create database <ArrowRight size={16} /></Link>
+            <Link className="mk-button mk-button-quiet" href="/pricing">View pricing</Link>
           </div>
-          <div className="hero-facts" aria-label="Product facts">
-            <span><Check size={14}/> PostgreSQL 17</span>
-            <span><Check size={14}/> TLS by default</span>
-            <span><Check size={14}/> Fixed pricing</span>
+          <div className="mk-proofline" aria-label="Platform details">
+            <span><i /> PostgreSQL 17</span>
+            <span><i /> TLS endpoint</span>
+            <span><i /> PgBouncer pooling</span>
+            <span><i /> fixed plan limits</span>
           </div>
         </div>
 
-        <div className="instrument" aria-label="Stashi dashboard preview">
-          <div className="instrument-topline">
-            <div><span className="mini-mark"/> stashi / production</div>
-            <span className="mono muted">US-EAST</span>
+        <div className="mk-console mk-noise" aria-label="Database dashboard preview">
+          <div className="mk-console-bar"><span>STASHI / DATABASE</span><b>HEALTHY</b></div>
+          <div className="mk-console-head">
+            <div><span>DATABASE</span><strong>payments-api</strong></div>
+            <div className="mk-health">ONLINE</div>
           </div>
-          <div className="instrument-head">
-            <div>
-              <span className="label">DATABASE</span>
-              <strong>payments-api</strong>
+          <div className="mk-metrics">
+            <div><span>STORAGE</span><strong>842 MB</strong><small>5 GB limit</small></div>
+            <div><span>CONNECTIONS</span><strong>7</strong><small>30 limit</small></div>
+            <div><span>P95 LATENCY</span><strong>38 ms</strong><small>last hour</small></div>
+          </div>
+          <div className="mk-uri">
+            <div className="mk-uri-label"><span>CONNECTION STRING</span><span>TLS REQUIRED</span></div>
+            <code>postgresql://payments_owner:••••••@db.stashi.dev:6432/payments?sslmode=require</code>
+          </div>
+        </div>
+      </section>
+
+      <section className="mk-strip">
+        <div className="mk-wrap mk-strip-inner">
+          <div className="mk-strip-copy">
+            <span className="mk-kicker">The service</span>
+            <h2>Postgres you can provision without learning a cloud billing model.</h2>
+            <p>Stashi handles the database endpoint, credentials, connection pooling and service health. You keep the normal PostgreSQL workflow and a monthly price that stays tied to the plan you chose.</p>
+          </div>
+          <div className="mk-spec-list">
+            <div className="mk-spec"><span>Connection</span><strong>Standard PostgreSQL URL over TLS</strong></div>
+            <div className="mk-spec"><span>Pooling</span><strong>PgBouncer included</strong></div>
+            <div className="mk-spec"><span>Visibility</span><strong>Storage, connections and query activity</strong></div>
+            <div className="mk-spec"><span>Plans</span><strong>Fixed monthly price with published limits</strong></div>
+          </div>
+        </div>
+      </section>
+
+      <section className="mk-wrap mk-story">
+        <div className="mk-story-grid">
+          <div>
+            <span className="mk-kicker">Built for real apps</span>
+            <h2>The common PostgreSQL path stays familiar.</h2>
+          </div>
+          <div className="mk-story-body">
+            <div className="mk-story-row">
+              <span>CREATE</span>
+              <div><h3>Choose a plan and name the database.</h3><p>The dashboard returns credentials and the connection string after provisioning. No instance sizing screen sits in front of the first query.</p></div>
             </div>
-            <span className="status-pill"><span className="status-dot"/> HEALTHY</span>
-          </div>
-          <div className="metric-strip">
-            <div><span>STORAGE</span><strong>842 MB</strong><small>of 5 GB</small></div>
-            <div><span>CONNECTIONS</span><strong>7</strong><small>of 30</small></div>
-            <div><span>P95 LATENCY</span><strong>38 ms</strong><small>last 1h</small></div>
-          </div>
-          <div className="terminal-card">
-            <div className="terminal-title"><Terminal size={13}/> CONNECTION</div>
-            <code>postgresql://payments_owner:••••••@db.ynai.co.ke:6432/payments_api?sslmode=require</code>
-            <button className="copy-chip">COPY</button>
-          </div>
-          <div className="table-head"><span>DATABASE</span><span>STATUS</span><span>STORAGE</span><span>P95</span></div>
-          {proofRows.map((row) => (
-            <div className="table-row" key={row[0]}>
-              <span>{row[0]}</span><span className="healthy-text"><span className="status-dot"/>{row[1]}</span><span>{row[2]}</span><span>{row[3]}</span>
+            <div className="mk-story-row">
+              <span>RUN</span>
+              <div><h3>Use your existing PostgreSQL stack.</h3><p>Connect from Prisma, Drizzle, Django, Rails, psql or another standard client. TLS is required at the public endpoint.</p></div>
             </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="signal-band" id="product">
-        <div className="wrap signal-grid">
-          <div className="signal-lead"><span className="mono">01</span><h2>The boring infrastructure is already handled.</h2></div>
-          <div className="signal-item"><Database size={18}/><strong>Managed PostgreSQL</strong><p>Provisioned, isolated by role and routed through PgBouncer.</p></div>
-          <div className="signal-item"><LockKeyhole size={18}/><strong>Secure by default</strong><p>TLS endpoints, strong credentials and raw Postgres kept private.</p></div>
-          <div className="signal-item"><Gauge size={18}/><strong>Measured scaling</strong><p>Capacity grows when telemetry proves a bottleneck, not before.</p></div>
-        </div>
-      </section>
-
-      <section className="wrap pricing-section" id="pricing">
-        <div className="section-heading">
-          <div><span className="mono section-index">02 / PRICING</span><h2>Small numbers. Clear limits.</h2></div>
-          <p>Start where the workload is today. Move up when the metrics prove you need to.</p>
-        </div>
-        <div className="pricing-grid">
-          {plans.map((plan) => (
-            <article className={`price-panel ${plan.recommended ? "price-featured" : ""}`} key={plan.id}>
-              <div className="price-panel-top">
-                <span className="plan-name">{plan.name}</span>
-                {plan.recommended && <span className="tiny-badge">POPULAR</span>}
-              </div>
-              <div className="price"><strong>{plan.price === null ? "$9+" : `$${plan.price}`}</strong><span>/ month</span></div>
-              <p>{plan.tagline}</p>
-              <div className="price-spec"><span>Storage</span><strong>{plan.storageGb} GB</strong></div>
-              <div className="price-spec"><span>Connections</span><strong>{plan.connections}</strong></div>
-              <div className="price-spec"><span>Backups</span><strong>{plan.backupRetentionDays} day{plan.backupRetentionDays > 1 ? "s" : ""}</strong></div>
-              <div className="price-spec"><span>Placement</span><strong>{plan.isolation}</strong></div>
-              <Link href="/login" className="price-link">Choose {plan.name} <ArrowRight size={14}/></Link>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="architecture-section" id="architecture">
-        <div className="wrap architecture-grid">
-          <div className="architecture-copy">
-            <span className="mono section-index">03 / MECHANISM</span>
-            <h2>A thin control plane over ordinary PostgreSQL.</h2>
-            <p>Stashi keeps the architecture intentionally legible: shared nodes for small databases, dedicated nodes when isolation matters, and a scheduler that places workloads using real capacity.</p>
-            <Link className="text-arrow" href="/login">Open the control plane <ArrowRight size={15}/></Link>
-          </div>
-          <div className="flow-diagram" aria-label="Provisioning flow">
-            <div className="flow-node"><span>REQUEST</span><strong>Create database</strong><small>plan + region</small></div>
-            <Waves className="flow-arrow" size={20}/>
-            <div className="flow-node"><span>SCHEDULER</span><strong>Place workload</strong><small>CPU · RAM · disk</small></div>
-            <Waves className="flow-arrow" size={20}/>
-            <div className="flow-node"><span>NODE</span><strong>PostgreSQL 17</strong><small>PgBouncer + TLS</small></div>
+            <div className="mk-story-row">
+              <span>WATCH</span>
+              <div><h3>See when the database is getting tight.</h3><p>Storage, active connections and query activity stay visible. Upgrade decisions come from the workload rather than an opaque compute meter.</p></div>
+            </div>
+            <div className="mk-story-row">
+              <span>MOVE</span>
+              <div><h3>It is still PostgreSQL.</h3><p>Use pg_dump and normal PostgreSQL tooling when you need to migrate. Stashi does not depend on a proprietary database API.</p></div>
+            </div>
           </div>
         </div>
       </section>
 
-      <section className="wrap final-cta">
-        <div><span className="status-dot"/> Provisioning available</div>
-        <h2>Give your app a database.<br/>Keep the bill boring.</h2>
-        <Link className="button button-light" href="/login">Create database <ArrowRight size={16}/></Link>
+      <section className="mk-price-tease">
+        <div className="mk-wrap mk-price-tease-inner">
+          <div><span className="mk-price-note">PLANS START AT $1 / MONTH</span><h2>Pick a limit. Know the bill.</h2></div>
+          <div><p>Dev plans cover tiny projects. Starter and Production add more storage, connections and backup retention. Dedicated capacity is available for workloads that need it.</p><Link className="mk-button mk-button-light" href="/pricing">Compare plans <ArrowRight size={15} /></Link></div>
+        </div>
       </section>
 
-      <footer className="wrap footer">
-        <span className="brand">stashi<span className="brand-dot">.</span></span>
-        <span>Managed PostgreSQL · built lean</span>
-        <span>Kenya → global</span>
-      </footer>
+      <section className="mk-wrap mk-final">
+        <div className="mk-final-panel mk-noise">
+          <div><span className="mk-kicker">PostgreSQL, ready to connect</span><h2>Create your first database.</h2></div>
+          <Link className="mk-button mk-button-dark" href="/login">Get started <ArrowRight size={16} /></Link>
+        </div>
+      </section>
+
+      <SiteFooter />
     </main>
   );
 }
