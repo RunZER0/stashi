@@ -1,44 +1,49 @@
 # Stashi
 
-Low-cost managed PostgreSQL with fixed monthly pricing.
+Managed PostgreSQL with fixed monthly plans.
 
-The MVP is a polished control-plane prototype plus the API boundary for a real provisioner. It demonstrates the complete customer journey: landing → sign in → create database → credentials → metrics → query activity → backups → lifecycle controls, plus an operator view for nodes, quotas and unit economics.
-
-## Run locally
+## Local development
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`. Any valid email can enter the MVP control plane.
+Open `http://localhost:3000`.
 
-## Build
+## Checks
 
 ```bash
+npm run check
 npm run build
-npm start
 ```
 
-## Product model
+## Product surface
 
-- Dev — $1/mo
-- Starter — $3/mo
-- Production — $5/mo
-- Dedicated — fixed higher tiers
+- Public marketing site
+- Product and pricing pages
+- Sign-in and account session boundary
+- Database creation flow
+- Database credentials and connection URL
+- Service metrics and query activity
+- Backup and restore controls
+- Database lifecycle actions
+- Operator node and quota views
+- Provisioning API boundary
 
-The pricing model is deliberately predictable. Metrics enforce limits and recommend upgrades; they do not silently meter compute into the bill.
+## Plans
 
-## Architecture
+| Plan | Monthly price | Storage | Connections |
+| --- | ---: | ---: | ---: |
+| Dev | $1 | 1 GB | 10 |
+| Starter | $3 | 5 GB | 30 |
+| Production | $5 | 15 GB | 75 |
+| Dedicated | $9+ | 40 GB+ | 200 |
 
-The customer-facing API is already shaped around asynchronous provisioning, while the current MVP provisioner is simulated so the full UX can be tested without touching a live PostgreSQL node. See [`docs/architecture.md`](docs/architecture.md) for the data plane, placement, backup and next-step design.
+## Infrastructure model
 
-## Current API surface
+Database nodes run PostgreSQL 17 behind PgBouncer. Public database connections require TLS. Shared plans use separate databases and roles on managed nodes; dedicated plans reserve node capacity.
 
-- `POST /api/session` — MVP session boundary
-- `POST /api/databases` — create/provision database
-- `POST /api/databases/:id/rotate` — rotate credentials
-- `POST /api/databases/:id/suspend` — suspend/resume
-- `POST /api/databases/:id/restore` — queue restore
+The current repository contains the web control plane and a simulated provisioner. The node agent that performs PostgreSQL and PgBouncer changes is the next infrastructure component.
 
-The live provisioner should implement these semantics against PostgreSQL 17 + PgBouncer + TLS on the VPS fleet.
+See [`docs/architecture.md`](docs/architecture.md).
