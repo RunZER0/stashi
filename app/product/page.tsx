@@ -16,7 +16,7 @@ export default function ProductPage() {
       <header className="mk-wrap mk-pagehead">
         <span className="mk-kicker">Product</span>
         <h1>Managed PostgreSQL with the normal PostgreSQL workflow.</h1>
-        <p>Provision a database, connect with a standard client, and manage the service from one dashboard. Stashi keeps plan limits visible and exposes the operational signals that matter to a small production workload.</p>
+        <p>Provision a database, connect with a standard client, and manage the service from one dashboard. Plan limits stay visible beside the operational signals that matter to a small production workload.</p>
       </header>
 
       <section className="mk-wrap mk-product">
@@ -35,12 +35,12 @@ export default function ProductPage() {
         <article className="mk-product-row">
           <div><span className="mk-kicker">Operations</span><h2>Health and limits stay on the same screen.</h2></div>
           <div className="mk-product-copy">
-            <p>The database view shows storage usage, connection pressure and recent query activity. Credentials can be rotated from the same surface.</p>
+            <p>The database view shows storage use, active connections, latency and recent query activity. Credential changes happen from the same surface.</p>
             <div className="mk-product-points">
-              <div className="mk-product-point"><span>Metrics</span><strong>Storage, connections, latency</strong></div>
+              <div className="mk-product-point"><span>Metrics</span><strong>Capacity and latency</strong></div>
               <div className="mk-product-point"><span>Query activity</span><strong>Powered by PostgreSQL statistics</strong></div>
-              <div className="mk-product-point"><span>Credentials</span><strong>Reveal, copy and rotate</strong></div>
-              <div className="mk-product-point"><span>Lifecycle</span><strong>Suspend, resume and delete</strong></div>
+              <div className="mk-product-point"><span>Credentials</span><strong>Copy or rotate from the dashboard</strong></div>
+              <div className="mk-product-point"><span>Lifecycle</span><strong>Suspend or resume access; delete when finished</strong></div>
             </div>
           </div>
         </article>
@@ -48,7 +48,7 @@ export default function ProductPage() {
         <article className="mk-product-row">
           <div><span className="mk-kicker">Recovery</span><h2>Backups are part of the database plan.</h2></div>
           <div className="mk-product-copy">
-            <p>Backup retention increases with the plan. Restore requests are visible in the dashboard so recovery work is explicit instead of hidden behind support tickets.</p>
+            <p>Backup retention increases with the plan. Restore requests stay visible in the dashboard with their current status.</p>
             <p>For critical systems, keep an independent backup outside Stashi as part of your own recovery plan.</p>
           </div>
         </article>
