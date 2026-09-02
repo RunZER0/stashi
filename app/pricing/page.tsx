@@ -17,7 +17,7 @@ export default function PricingPage() {
       <header className="mk-wrap mk-pagehead">
         <span className="mk-kicker">Pricing</span>
         <h1>Fixed monthly plans.</h1>
-        <p>Choose the capacity you need now. Storage, connection limits and backup retention are published with the price.</p>
+        <p>Choose the capacity you need now. Capacity limits and backup retention are published with the price.</p>
       </header>
 
       <section className="mk-wrap mk-pricing">
