@@ -48,12 +48,12 @@ export default function Home() {
           <div className="mk-strip-copy">
             <span className="mk-kicker">The service</span>
             <h2>Postgres you can provision without learning a cloud billing model.</h2>
-            <p>Stashi handles the database endpoint, credentials, connection pooling and service health. You keep the normal PostgreSQL workflow and a monthly price that stays tied to the plan you chose.</p>
+            <p>Stashi handles the database endpoint, credentials, connection pooling and service health. You keep the normal PostgreSQL workflow and a monthly price tied to the plan you chose.</p>
           </div>
           <div className="mk-spec-list">
             <div className="mk-spec"><span>Connection</span><strong>Standard PostgreSQL URL over TLS</strong></div>
             <div className="mk-spec"><span>Pooling</span><strong>PgBouncer included</strong></div>
-            <div className="mk-spec"><span>Visibility</span><strong>Storage, connections and query activity</strong></div>
+            <div className="mk-spec"><span>Visibility</span><strong>Storage, active connections, latency and query activity</strong></div>
             <div className="mk-spec"><span>Plans</span><strong>Fixed monthly price with published limits</strong></div>
           </div>
         </div>
@@ -76,7 +76,7 @@ export default function Home() {
             </div>
             <div className="mk-story-row">
               <span>WATCH</span>
-              <div><h3>See when the database is getting tight.</h3><p>Storage, active connections and query activity stay visible. Upgrade decisions come from the workload rather than an opaque compute meter.</p></div>
+              <div><h3>See when the database is getting tight.</h3><p>Capacity and query activity stay visible. Upgrade decisions come from the workload rather than an opaque compute meter.</p></div>
             </div>
             <div className="mk-story-row">
               <span>MOVE</span>
@@ -89,7 +89,7 @@ export default function Home() {
       <section className="mk-price-tease">
         <div className="mk-wrap mk-price-tease-inner">
           <div><span className="mk-price-note">PLANS START AT $1 / MONTH</span><h2>Pick a limit. Know the bill.</h2></div>
-          <div><p>Dev plans cover tiny projects. Starter and Production add more storage, connections and backup retention. Dedicated capacity is available for workloads that need it.</p><Link className="mk-button mk-button-light" href="/pricing">Compare plans <ArrowRight size={15} /></Link></div>
+          <div><p>Dev covers tiny projects. Starter and Production raise the limits and extend backup retention. Dedicated capacity is available for workloads that need it.</p><Link className="mk-button mk-button-light" href="/pricing">Compare plans <ArrowRight size={15} /></Link></div>
         </div>
       </section>
 
