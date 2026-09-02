@@ -13,8 +13,13 @@ Restart=always
 RestartSec=5s
 
 # Security Hardening
+# ProtectSystem=full makes /etc read-only, which breaks the tenant-provisioning
+# flow: the agent needs to append/remove SCRAM hashes in
+# /etc/pgbouncer/userlist.txt as part of create/rotate/delete jobs. Keep /etc
+# protected everywhere else and carve out only that one path.
 NoNewPrivileges=true
 ProtectSystem=full
+ReadWritePaths=/etc/pgbouncer
 ProtectHome=true
 PrivateTmp=true
 MemoryHigh=150M

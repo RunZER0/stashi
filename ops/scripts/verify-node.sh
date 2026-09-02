@@ -120,12 +120,17 @@ fi
 echo "--> Test 11 & 12: Running backup & restore drill..."
 TEMP_BACKUP="/tmp/${TEST_DB}.dump"
 sudo -u postgres pg_dump -Fc -f "$TEMP_BACKUP" "$TEST_DB"
+if [[ -s "$TEMP_BACKUP" ]]; then
+  pass "Off-node-style backup created ($(stat -c%s "$TEMP_BACKUP") bytes)."
+else
+  fail "Backup file is empty or missing."
+fi
 RESTORE_DB="${TEST_DB}_restored"
 sudo -u postgres createdb "$RESTORE_DB"
 sudo -u postgres pg_restore -d "$RESTORE_DB" "$TEMP_BACKUP" || true
 RESTORE_COUNT=$(sudo -u postgres psql -At -d "$RESTORE_DB" -c "SELECT count(*) FROM items;")
 if [[ "$RESTORE_COUNT" -eq 2 ]]; then
-  pass "Backup and restore drill verified (${RESTORE_COUNT} rows restored)."
+  pass "Restore drill verified (${RESTORE_COUNT} rows restored)."
 else
   fail "Restore count mismatch: expected 2, got ${RESTORE_COUNT}"
 fi
@@ -154,7 +159,10 @@ pass "Database daemon recovery verified."
 # public URL; report SKIPPED honestly rather than faking a pass with no URL set.
 echo "--> Test 15: Web control plane boundary check..."
 if [[ -n "${STASHI_CONTROL_PLANE_URL:-}" ]]; then
-  if curl -fsS -m 10 "${STASHI_CONTROL_PLANE_URL}/api/agent/jobs" -X POST -H 'content-type: application/json' -d '{"nodeId":"verify-node-check"}' >/dev/null 2>&1; then
+  # A bare, unsigned POST to /api/agent/jobs is *supposed* to fail with 401 --
+  # that's the HMAC auth working. Check plain reachability against the root
+  # path instead of treating a correct auth rejection as "unreachable".
+  if curl -fsS -m 10 "${STASHI_CONTROL_PLANE_URL}/" >/dev/null 2>&1; then
     pass "Control plane reachable at ${STASHI_CONTROL_PLANE_URL}."
   else
     fail "STASHI_CONTROL_PLANE_URL is set but not reachable: ${STASHI_CONTROL_PLANE_URL}"

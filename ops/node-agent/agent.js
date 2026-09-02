@@ -242,7 +242,7 @@ async function pollJobs() {
       if (handler) {
         try {
           const result = await handler(payload);
-          await postControlPlane("/api/agent/jobs/complete", { jobId: id, status: "success", result });
+          await postControlPlane("/api/agent/jobs/complete", { jobId: id, status: "completed", result });
         } catch (jobErr) {
           console.error(`[Job #${id} Failed]:`, jobErr);
           await postControlPlane("/api/agent/jobs/complete", { jobId: id, status: "failed", error: jobErr.message });
