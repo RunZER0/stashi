@@ -1,10 +1,14 @@
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
 import "./globals.css";
+import "./marketing.css";
 
 export const metadata: Metadata = {
-  title: "Stashi — PostgreSQL without surprise bills",
-  description: "Fixed-price managed PostgreSQL for developers who want boring bills and production-grade defaults.",
+  title: {
+    default: "Stashi — Managed PostgreSQL from $1/month",
+    template: "%s — Stashi",
+  },
+  description: "Create a PostgreSQL database with TLS, connection pooling and a fixed monthly price.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
