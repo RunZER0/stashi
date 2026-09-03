@@ -229,6 +229,11 @@ const JobHandlers = {
 
     await runPsql(`SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE usename = '${cleanRole}';`);
     await runPsql(`DROP SCHEMA IF EXISTS "${cleanSchema}" CASCADE;`, ["-d", cleanDb]);
+    // create_pool_tenant grants CONNECT/TEMP on the shared database itself;
+    // that grant is a real dependency and blocks DROP ROLE until revoked
+    // (confirmed live: "role ... cannot be dropped because some objects
+    // depend on it — privileges for database stashi_pool").
+    await runPsql(`REVOKE ALL ON DATABASE "${cleanDb}" FROM "${cleanRole}";`);
     await runPsql(`DROP ROLE IF EXISTS "${cleanRole}";`);
     reloadPgbouncerAuth(cleanRole, null);
 
@@ -254,7 +259,12 @@ const JobHandlers = {
   // ops/scripts/backup.sh for the same pattern once credentials exist.)
   async create_checkpoint({ checkpoint_id, database_name, pool_database, schema_name }) {
     const cleanCheckpoint = cleanIdent(checkpoint_id);
-    await run("sudo", ["-u", "postgres", "mkdir", "-p", CHECKPOINT_DIR]);
+    // The agent runs as root (no sudo needed for its own filesystem ops),
+    // but pg_dump below runs as postgres and needs write access to actually
+    // create files here -- postgres itself can't mkdir under /var/backups,
+    // it doesn't own that parent directory.
+    await run("mkdir", ["-p", CHECKPOINT_DIR]);
+    await run("chown", ["-R", "postgres:postgres", "/var/backups/stashi"]);
     const filePath = `${CHECKPOINT_DIR}/${cleanCheckpoint}.dump`;
 
     if (pool_database && schema_name) {
