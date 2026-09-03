@@ -104,10 +104,12 @@ export async function ensureSchema() {
       status text NOT NULL DEFAULT 'pending',
       size_bytes bigint,
       file_path text,
+      off_node boolean NOT NULL DEFAULT false,
       created_at timestamptz NOT NULL DEFAULT now(),
       error text
     );
     CREATE INDEX IF NOT EXISTS checkpoints_database_idx ON checkpoints(database_id, created_at DESC);
+    ALTER TABLE checkpoints ADD COLUMN IF NOT EXISTS off_node boolean NOT NULL DEFAULT false;
 
     INSERT INTO nodes (id, label, region, capacity_status)
     VALUES ('node-nj-01', 'NJ · 01', 'New Jersey, US', 'pending')

@@ -255,9 +255,13 @@ const JobHandlers = {
   },
 
   // 8. Create a checkpoint/backup — a real pg_dump, stored on this node.
-  // (Off-node upload to R2/S3 is a separate, not-yet-wired step; see
-  // ops/scripts/backup.sh for the same pattern once credentials exist.)
-  async create_checkpoint({ checkpoint_id, database_name, pool_database, schema_name }) {
+  // "backup"-kind checkpoints additionally push to off-node S3-compatible
+  // storage (Backblaze B2) when R2_ENDPOINT_URL/R2_BUCKET are configured;
+  // "checkpoint"-kind ones (the fast, agent-triggered rollback mechanism)
+  // stay local-only — speed matters more there than long-term retention.
+  // The local copy is always kept either way, so restore never depends on
+  // the network round trip having succeeded.
+  async create_checkpoint({ checkpoint_id, database_name, pool_database, schema_name, kind }) {
     const cleanCheckpoint = cleanIdent(checkpoint_id);
     // The agent runs as root (no sudo needed for its own filesystem ops),
     // but pg_dump below runs as postgres and needs write access to actually
@@ -278,7 +282,30 @@ const JobHandlers = {
 
     await run("sudo", ["chmod", "600", filePath]);
     const stats = fs.statSync(filePath);
-    return { status: "ready", file_path: filePath, size_bytes: stats.size };
+
+    let offNode = false;
+    const r2Endpoint = process.env.R2_ENDPOINT_URL;
+    const r2Bucket = process.env.R2_BUCKET;
+    if (kind === "backup" && r2Endpoint && r2Bucket) {
+      try {
+        await run("aws", [
+          "--endpoint-url",
+          r2Endpoint,
+          "s3",
+          "cp",
+          filePath,
+          `s3://${r2Bucket}/${cleanCheckpoint}.dump`,
+        ]);
+        offNode = true;
+      } catch (err) {
+        // The local snapshot is still real and restorable -- don't fail the
+        // whole job over an off-node upload hiccup, just report it wasn't
+        // copied off-node this time.
+        console.error(`[Backup off-node upload failed]: ${err.message}`);
+      }
+    }
+
+    return { status: "ready", file_path: filePath, size_bytes: stats.size, off_node: offNode };
   },
 
   // 9. Restore a checkpoint — wipes current state and replaces it with the

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Clock3, HardDrive, Plus, RotateCcw } from "lucide-react";
+import { Check, Clock3, Cloud, HardDrive, Plus, RotateCcw } from "lucide-react";
 import type { Checkpoint } from "@/lib/control-plane";
 
 const formatSize = (bytes: number | null) => {
@@ -120,8 +120,8 @@ export function CheckpointsPanel({
           </div>
         ) : checkpoints.length === 0 ? (
           <p className="panel-footnote">
-            No snapshots yet. Backups are real pg_dump snapshots stored on this database&apos;s node — off-node
-            copies to object storage aren&apos;t wired up yet.
+            No snapshots yet. Checkpoints are fast, node-local — meant for quick rollback during iterative changes.
+            Backups additionally copy off-node to Backblaze B2.
           </p>
         ) : (
           <div>
@@ -131,6 +131,20 @@ export function CheckpointsPanel({
                   <span className={`checkpoint-kind ${c.kind === "backup" ? "kind-backup" : ""}`}>
                     {c.kind === "backup" ? "BACKUP" : "CHECKPOINT"}
                   </span>
+                  {c.kind === "backup" && c.status === "ready" && (
+                    <span
+                      className="tiny-badge"
+                      style={{
+                        marginLeft: "6px",
+                        color: c.offNode ? "var(--green)" : "var(--muted)",
+                        borderColor: c.offNode ? "rgba(52,211,153,.35)" : undefined,
+                      }}
+                      title={c.offNode ? "Copied off-node to Backblaze B2" : "Local only — off-node upload didn't complete"}
+                    >
+                      <Cloud size={9} style={{ marginRight: 3, verticalAlign: "-1px" }} />
+                      {c.offNode ? "OFF-NODE" : "LOCAL ONLY"}
+                    </span>
+                  )}
                   <div style={{ marginTop: "5px", color: "var(--ink)" }}>{c.label}</div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "5px", color: "var(--muted)" }}>

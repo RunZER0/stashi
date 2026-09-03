@@ -102,6 +102,7 @@ function rowToCheckpoint(row: any): Checkpoint {
     label: row.label,
     status: row.status,
     sizeBytes: row.size_bytes === null ? null : Number(row.size_bytes),
+    offNode: row.off_node,
     createdAt: row.created_at.toISOString(),
     error: row.error ?? undefined,
   };
@@ -377,8 +378,8 @@ export async function createCheckpoint(
   const jobId = newId("job");
   const payload =
     db.tenancyMode === "pooled"
-      ? { checkpoint_id: checkpointId, pool_database: POOL_DATABASE, schema_name: db.poolSchema }
-      : { checkpoint_id: checkpointId, database_name: db.database };
+      ? { checkpoint_id: checkpointId, pool_database: POOL_DATABASE, schema_name: db.poolSchema, kind }
+      : { checkpoint_id: checkpointId, database_name: db.database, kind };
   await pool.query(
     `INSERT INTO jobs (id, node_id, type, payload, status, owner_email, database_id)
      VALUES ($1,$2,'create_checkpoint',$3,'pending',$4,$5)`,
@@ -513,11 +514,10 @@ export async function completeJob(
   if (job.type === "create_checkpoint") {
     const checkpointId = job.payload.checkpoint_id as string;
     if (ok) {
-      await pool.query(`UPDATE checkpoints SET status = 'ready', size_bytes = $2, file_path = $3 WHERE id = $1`, [
-        checkpointId,
-        result?.size_bytes ?? null,
-        result?.file_path ?? null,
-      ]);
+      await pool.query(
+        `UPDATE checkpoints SET status = 'ready', size_bytes = $2, file_path = $3, off_node = $4 WHERE id = $1`,
+        [checkpointId, result?.size_bytes ?? null, result?.file_path ?? null, Boolean(result?.off_node)]
+      );
     } else {
       await pool.query(`UPDATE checkpoints SET status = 'failed', error = $2 WHERE id = $1`, [
         checkpointId,

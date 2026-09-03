@@ -39,6 +39,7 @@ export type Checkpoint = {
   label: string;
   status: CheckpointStatus;
   sizeBytes: number | null;
+  offNode: boolean;
   createdAt: string;
   error?: string;
 };
