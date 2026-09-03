@@ -21,7 +21,7 @@ export const plans: Plan[] = [
     storageGb: 1,
     connections: 10,
     backupRetentionDays: 1,
-    isolation: "Shared node",
+    isolation: "Shared pool, schema-isolated",
   },
   {
     id: "starter",
@@ -31,7 +31,7 @@ export const plans: Plan[] = [
     storageGb: 5,
     connections: 30,
     backupRetentionDays: 3,
-    isolation: "Shared node",
+    isolation: "Own database, shared node",
     recommended: true,
   },
   {
@@ -42,7 +42,7 @@ export const plans: Plan[] = [
     storageGb: 15,
     connections: 75,
     backupRetentionDays: 7,
-    isolation: "Priority shared node",
+    isolation: "Own database, priority node",
   },
   {
     id: "dedicated",

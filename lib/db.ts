@@ -46,9 +46,13 @@ export async function ensureSchema() {
       created_at timestamptz NOT NULL DEFAULT now(),
       storage_used_mb integer NOT NULL DEFAULT 0,
       connections integer NOT NULL DEFAULT 0,
-      p95_latency_ms integer
+      p95_latency_ms integer,
+      tenancy_mode text NOT NULL DEFAULT 'isolated',
+      pool_schema text
     );
     CREATE INDEX IF NOT EXISTS databases_owner_idx ON databases(owner_email);
+    ALTER TABLE databases ADD COLUMN IF NOT EXISTS tenancy_mode text NOT NULL DEFAULT 'isolated';
+    ALTER TABLE databases ADD COLUMN IF NOT EXISTS pool_schema text;
 
     CREATE TABLE IF NOT EXISTS activity (
       id text PRIMARY KEY,
@@ -85,6 +89,25 @@ export async function ensureSchema() {
       error text
     );
     CREATE INDEX IF NOT EXISTS jobs_status_idx ON jobs(status, node_id);
+
+    -- Point-in-time snapshots. "checkpoint" (fast, manual/agent-triggered,
+    -- meant for rapid rollback during iterative schema changes) and "backup"
+    -- (the plan's scheduled/retained snapshot) are the same underlying
+    -- pg_dump mechanism with a different kind tag and retention policy —
+    -- one real system instead of two parallel fake ones.
+    CREATE TABLE IF NOT EXISTS checkpoints (
+      id text PRIMARY KEY,
+      database_id text NOT NULL,
+      owner_email text NOT NULL REFERENCES users(email),
+      kind text NOT NULL DEFAULT 'checkpoint',
+      label text NOT NULL,
+      status text NOT NULL DEFAULT 'pending',
+      size_bytes bigint,
+      file_path text,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      error text
+    );
+    CREATE INDEX IF NOT EXISTS checkpoints_database_idx ON checkpoints(database_id, created_at DESC);
 
     INSERT INTO nodes (id, label, region, capacity_status)
     VALUES ('node-nj-01', 'NJ · 01', 'New Jersey, US', 'pending')

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   Activity,
@@ -25,10 +25,20 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { makeConnectionString, type ActivityEntry, type ManagedDatabase, type Node } from "@/lib/control-plane";
+import {
+  makeConnectionString,
+  type ActivityEntry,
+  type Checkpoint,
+  type ManagedDatabase,
+  type Node,
+} from "@/lib/control-plane";
 import { getPlan, plans, type PlanId } from "@/lib/plans";
+import { SqlEditor } from "./sql-editor";
+import { CheckpointsPanel } from "./checkpoints-panel";
 
-type Tab = "overview" | "connection" | "agent" | "metrics" | "activity" | "backups" | "settings";
+type Tab = "overview" | "sql" | "connection" | "agent" | "metrics" | "activity" | "backups" | "settings";
+
+const TRANSIENT_STATUSES = new Set(["provisioning", "resizing"]);
 
 const workspaceLabel = (email: string) => {
   const handle = email.split("@")[0] || "your";
@@ -57,6 +67,9 @@ export default function ConsoleClient({
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("new-app");
   const [newPlan, setNewPlan] = useState<PlanId>("starter");
+  const [planChangeOpen, setPlanChangeOpen] = useState(false);
+  const [changingPlan, setChangingPlan] = useState(false);
+  const [busyAction, setBusyAction] = useState<"rotate" | "suspend" | "delete" | null>(null);
 
   const db = useMemo(() => databases.find((item) => item.id === activeId) ?? null, [databases, activeId]);
   const plan = db ? getPlan(db.plan) : null;
@@ -79,7 +92,7 @@ export default function ConsoleClient({
     setActivity(payload.activity ?? []);
   };
 
-  const pollUntilSettled = async (id: string) => {
+  const pollUntilSettled = async (id: string, settledMessage?: (status: string) => string) => {
     for (let attempt = 0; attempt < 12; attempt++) {
       await new Promise((resolve) => setTimeout(resolve, 2500));
       const response = await fetch("/api/databases");
@@ -88,9 +101,9 @@ export default function ConsoleClient({
       const list: ManagedDatabase[] = payload.databases ?? [];
       setDatabases(list);
       const match = list.find((item) => item.id === id);
-      if (match && match.status !== "provisioning") {
+      if (match && !TRANSIENT_STATUSES.has(match.status)) {
         await refreshActivity();
-        notify(match.status === "healthy" ? "Database ready" : "Provisioning failed — check Settings");
+        notify(settledMessage ? settledMessage(match.status) : match.status === "healthy" ? "Database ready" : "Something went wrong — check Settings");
         return;
       }
     }
@@ -117,43 +130,78 @@ export default function ConsoleClient({
 
   const rotatePassword = async () => {
     if (!db) return;
-    const response = await fetch(`/api/databases/${db.id}/rotate`, { method: "POST" });
-    const payload = await response.json();
-    setDatabases((current) =>
-      current.map((item) => (item.id === db.id ? { ...item, password: payload.password } : item))
-    );
-    setShowSecret(true);
-    await refreshActivity();
-    notify("Credentials rotated");
+    setBusyAction("rotate");
+    try {
+      const response = await fetch(`/api/databases/${db.id}/rotate`, { method: "POST" });
+      const payload = await response.json();
+      setDatabases((current) =>
+        current.map((item) => (item.id === db.id ? { ...item, password: payload.password } : item))
+      );
+      setShowSecret(true);
+      await refreshActivity();
+      notify("Credentials rotated");
+    } finally {
+      setBusyAction(null);
+    }
   };
 
   const toggleSuspend = async () => {
     if (!db) return;
-    const suspended = db.status !== "suspended";
-    await fetch(`/api/databases/${db.id}/suspend`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ suspended }),
-    });
-    setDatabases((current) =>
-      current.map((item) => (item.id === db.id ? { ...item, status: suspended ? "suspended" : "healthy" } : item))
-    );
-    await refreshActivity();
-    notify(suspended ? "Database suspended" : "Database resumed");
+    setBusyAction("suspend");
+    try {
+      const suspended = db.status !== "suspended";
+      await fetch(`/api/databases/${db.id}/suspend`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ suspended }),
+      });
+      setDatabases((current) =>
+        current.map((item) => (item.id === db.id ? { ...item, status: suspended ? "suspended" : "healthy" } : item))
+      );
+      await refreshActivity();
+      notify(suspended ? "Database suspended" : "Database resumed");
+    } finally {
+      setBusyAction(null);
+    }
   };
 
   const deleteDatabase = async () => {
     if (!db) return;
     if (!window.confirm(`Delete "${db.name}"? This cannot be undone.`)) return;
-    await fetch(`/api/databases/${db.id}`, { method: "DELETE" });
-    setDatabases((current) => {
-      const next = current.filter((item) => item.id !== db.id);
-      setActiveId(next[0]?.id ?? null);
-      return next;
+    setBusyAction("delete");
+    try {
+      await fetch(`/api/databases/${db.id}`, { method: "DELETE" });
+      setDatabases((current) => {
+        const next = current.filter((item) => item.id !== db.id);
+        setActiveId(next[0]?.id ?? null);
+        return next;
+      });
+      setTab("overview");
+      await refreshActivity();
+      notify("Database deleted");
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const changePlan = async (newPlanId: PlanId) => {
+    if (!db) return;
+    setChangingPlan(true);
+    const response = await fetch(`/api/databases/${db.id}/plan`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ plan: newPlanId }),
     });
-    setTab("overview");
-    await refreshActivity();
-    notify("Database deleted");
+    const payload = await response.json();
+    setChangingPlan(false);
+    if (!response.ok) {
+      notify(payload.error || "Could not change plan");
+      return;
+    }
+    setDatabases((current) => current.map((item) => (item.id === db.id ? payload.database : item)));
+    setPlanChangeOpen(false);
+    notify("Plan change queued — applying now");
+    pollUntilSettled(db.id, (status) => (status === "healthy" ? "Plan updated" : "Plan change failed — check Activity"));
   };
 
   return (
@@ -251,7 +299,8 @@ export default function ConsoleClient({
               <div className="database-heading">
                 <div>
                   <span className="mono section-index">
-                    POSTGRESQL {db.version} · {db.region.toUpperCase()} · MCP READY
+                    POSTGRESQL {db.version} · {db.region.toUpperCase()} ·{" "}
+                    {db.tenancyMode === "pooled" ? "SHARED POOL, OWN SCHEMA" : "ISOLATED DATABASE"} · MCP READY
                   </span>
                   <h1>{db.name}</h1>
                   <p>
@@ -285,12 +334,23 @@ export default function ConsoleClient({
                   </p>
                 </div>
               )}
+              {db.status === "resizing" && (
+                <div className="data-panel" style={{ borderColor: "rgba(251, 191, 36, 0.35)", background: "var(--amber-soft)", padding: "14px 16px", marginBottom: "18px", display: "flex", alignItems: "center", gap: "10px" }}>
+                  <span className="spinner" />
+                  <div>
+                    <strong style={{ color: "var(--amber)", fontSize: "12px" }}>Applying a change on the node agent…</strong>
+                    <p style={{ margin: "4px 0 0", fontSize: "11px", color: "var(--muted)" }}>
+                      This settles automatically, usually within a few seconds.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <div className="tabs" role="tablist">
-                {(["overview", "connection", "agent", "metrics", "activity", "backups", "settings"] as Tab[]).map(
+                {(["overview", "sql", "connection", "agent", "metrics", "activity", "backups", "settings"] as Tab[]).map(
                   (item) => (
                     <button key={item} className={tab === item ? "tab-active" : ""} onClick={() => setTab(item)}>
-                      {item === "agent" ? "Agent & MCP" : item}
+                      {item === "agent" ? "Agent & MCP" : item === "sql" ? "SQL Editor" : item}
                     </button>
                   )
                 )}
@@ -299,6 +359,14 @@ export default function ConsoleClient({
               {tab === "overview" && (
                 <Overview db={db} plan={plan!} connectionString={connectionString} copy={copy} setTab={setTab} activity={activity} primaryNode={primaryNode} />
               )}
+              {tab === "sql" &&
+                (db.status === "healthy" ? (
+                  <SqlEditor databaseId={db.id} />
+                ) : (
+                  <section className="data-panel" style={{ padding: "40px 20px", textAlign: "center", color: "var(--muted)", fontSize: "12px" }}>
+                    The SQL editor needs this database to be healthy first.
+                  </section>
+                ))}
               {tab === "connection" && (
                 <Connection
                   db={db}
@@ -307,6 +375,7 @@ export default function ConsoleClient({
                   setShowSecret={setShowSecret}
                   copy={copy}
                   rotatePassword={rotatePassword}
+                  rotating={busyAction === "rotate"}
                 />
               )}
               {tab === "agent" && (
@@ -314,9 +383,18 @@ export default function ConsoleClient({
               )}
               {tab === "metrics" && <Metrics db={db} />}
               {tab === "activity" && <ActivityPanel activity={activity} />}
-              {tab === "backups" && <Backups notify={notify} />}
+              {tab === "backups" && <CheckpointsPanel databaseId={db.id} notify={notify} />}
               {tab === "settings" && (
-                <Settings db={db} plan={plan!} toggleSuspend={toggleSuspend} deleteDatabase={deleteDatabase} notify={notify} />
+                <Settings
+                  db={db}
+                  plan={plan!}
+                  toggleSuspend={toggleSuspend}
+                  deleteDatabase={deleteDatabase}
+                  suspending={busyAction === "suspend"}
+                  deleting={busyAction === "delete"}
+                  notify={notify}
+                  onOpenPlanChange={() => setPlanChangeOpen(true)}
+                />
               )}
             </>
           )}
@@ -332,6 +410,14 @@ export default function ConsoleClient({
           creating={creating}
           onClose={() => setCreateOpen(false)}
           onCreate={createDatabase}
+        />
+      )}
+      {planChangeOpen && db && (
+        <PlanChangeModal
+          currentPlan={db.plan}
+          changing={changingPlan}
+          onClose={() => setPlanChangeOpen(false)}
+          onChange={changePlan}
         />
       )}
       {toast && (
@@ -490,6 +576,7 @@ function Connection({
   setShowSecret,
   copy,
   rotatePassword,
+  rotating,
 }: {
   db: ManagedDatabase;
   connectionString: string;
@@ -497,6 +584,7 @@ function Connection({
   setShowSecret: (v: boolean) => void;
   copy: (v: string, l?: string) => void;
   rotatePassword: () => void;
+  rotating: boolean;
 }) {
   const rows = [
     ["Host", db.host],
@@ -549,8 +637,9 @@ function Connection({
             </p>
           </div>
         </div>
-        <button className="button button-ghost button-compact" onClick={rotatePassword}>
-          <RefreshCcw size={14} /> Rotate
+        <button className="button button-ghost button-compact" onClick={rotatePassword} disabled={rotating}>
+          {rotating ? <span className="spinner" /> : <RefreshCcw size={14} />}
+          {rotating ? "Rotating…" : "Rotate"}
         </button>
       </section>
     </div>
@@ -578,6 +667,8 @@ function AgentPanel({
           args: ["-y", "@stashi/mcp-server"],
           env: {
             STASHI_API_KEY: db.apiKey,
+            STASHI_DATABASE_ID: db.id,
+            STASHI_API_URL: typeof window !== "undefined" ? window.location.origin : "https://stashi.onrender.com",
             DATABASE_URL: connectionString,
           },
         },
@@ -614,26 +705,7 @@ function AgentPanel({
 
       {/* Autonomous Guardrails & Anti-Hallucination Controls */}
       <div className="content-grid two-one">
-        <section className="data-panel">
-          <div className="panel-header">
-            <div>
-              <span className="label">ANTI-HALLUCINATION CONTROLS</span>
-              <h3>Schema Checkpoints</h3>
-            </div>
-            <span className="tiny-badge tiny-warning">NOT CONNECTED</span>
-          </div>
-          <p style={{ fontSize: "12px", color: "var(--muted)", lineHeight: 1.6, margin: "0 0 16px" }}>
-            Point-in-time schema snapshots run on the live node agent. This database isn&apos;t attached to a provisioned node yet, so checkpoints aren&apos;t available.
-          </p>
-          <div style={{ display: "flex", gap: "10px" }}>
-            <button className="button button-ghost button-compact" disabled>
-              <Check size={14} /> Save Checkpoint
-            </button>
-            <button className="button button-ghost button-compact" disabled>
-              <RotateCcw size={14} /> Rollback Last Checkpoint
-            </button>
-          </div>
-        </section>
+        <QuickCheckpoints db={db} notify={notify} />
 
         <section className="data-panel">
           <div className="panel-header">
@@ -660,6 +732,92 @@ function AgentPanel({
         </section>
       </div>
     </div>
+  );
+}
+
+function QuickCheckpoints({ db, notify }: { db: ManagedDatabase; notify: (m: string) => void }) {
+  const [latest, setLatest] = useState<Checkpoint | null | undefined>(undefined);
+  const [saving, setSaving] = useState(false);
+  const [rollingBack, setRollingBack] = useState(false);
+
+  const load = async () => {
+    const res = await fetch(`/api/databases/${db.id}/checkpoints`);
+    if (!res.ok) return;
+    const payload = await res.json();
+    const ready = (payload.checkpoints as Checkpoint[] | undefined)?.find((c) => c.status === "ready");
+    setLatest(ready ?? null);
+  };
+
+  useEffect(() => {
+    load();
+  }, [db.id]);
+
+  const saveCheckpoint = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/databases/${db.id}/checkpoints`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ kind: "checkpoint", label: "Checkpoint" }),
+      });
+      if (res.ok) {
+        notify("Checkpoint saving…");
+        await load();
+      } else {
+        const payload = await res.json().catch(() => ({}));
+        notify(payload.error || "Could not save checkpoint");
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const rollback = async () => {
+    if (!latest) return;
+    if (!window.confirm(`Roll back to "${latest.label}"? This overwrites all current data.`)) return;
+    setRollingBack(true);
+    try {
+      const res = await fetch(`/api/databases/${db.id}/checkpoints/${latest.id}/restore`, { method: "POST" });
+      if (res.ok) {
+        notify("Rolling back…");
+      } else {
+        const payload = await res.json().catch(() => ({}));
+        notify(payload.error || "Rollback failed to start");
+      }
+    } finally {
+      setRollingBack(false);
+    }
+  };
+
+  return (
+    <section className="data-panel">
+      <div className="panel-header">
+        <div>
+          <span className="label">ANTI-HALLUCINATION CONTROLS</span>
+          <h3>Schema Checkpoints</h3>
+        </div>
+        <span className="tiny-badge tiny-success">LIVE</span>
+      </div>
+      <p style={{ fontSize: "12px", color: "var(--muted)", lineHeight: 1.6, margin: "0 0 16px" }}>
+        Real point-in-time snapshots, not a queue promise — an agent (or you) can save one before a risky migration
+        and roll back instantly if it goes wrong. Full history is in the Backups tab.
+      </p>
+      <div style={{ display: "flex", gap: "10px" }}>
+        <button className="button button-ghost button-compact" onClick={saveCheckpoint} disabled={saving || db.status !== "healthy"}>
+          {saving ? <span className="spinner" /> : <Check size={14} />}
+          Save Checkpoint
+        </button>
+        <button
+          className="button button-ghost button-compact"
+          onClick={rollback}
+          disabled={rollingBack || !latest || db.status !== "healthy"}
+          title={latest ? latest.label : "No checkpoint yet"}
+        >
+          {rollingBack ? <span className="spinner" /> : <RotateCcw size={14} />}
+          Rollback Last Checkpoint
+        </button>
+      </div>
+    </section>
   );
 }
 
@@ -735,54 +893,24 @@ function ActivityPanel({ activity }: { activity: ActivityEntry[] }) {
   );
 }
 
-function Backups({ notify }: { notify: (m: string) => void }) {
-  return (
-    <div className="panel-stack">
-      <section className="data-panel backup-hero">
-        <div>
-          <span className="label">BACKUP POLICY</span>
-          <h3>Not yet connected to a live node.</h3>
-          <p>
-            Off-node backups run from the node agent once a database is placed on a provisioned node. No backups have been taken for this database.
-          </p>
-        </div>
-        <div className="backup-stat">
-          <span>STATUS</span>
-          <strong>Pending</strong>
-          <small>no node attached</small>
-        </div>
-      </section>
-      <section className="data-panel">
-        <div className="panel-header">
-          <div>
-            <span className="label">RESTORE POINTS</span>
-            <h3>Available backups</h3>
-          </div>
-          <button
-            className="button button-ghost button-compact"
-            onClick={() => notify("Backups aren't available until this database is on a live node")}
-          >
-            <Plus size={14} /> Backup now
-          </button>
-        </div>
-        <p className="panel-footnote">No backups yet.</p>
-      </section>
-    </div>
-  );
-}
-
 function Settings({
   db,
   plan,
   toggleSuspend,
   deleteDatabase,
+  suspending,
+  deleting,
   notify,
+  onOpenPlanChange,
 }: {
   db: ManagedDatabase;
   plan: ReturnType<typeof getPlan>;
   toggleSuspend: () => void;
   deleteDatabase: () => void;
+  suspending: boolean;
+  deleting: boolean;
   notify: (m: string) => void;
+  onOpenPlanChange: () => void;
 }) {
   return (
     <div className="panel-stack">
@@ -794,12 +922,17 @@ function Settings({
               {plan.name} · {plan.price === null ? "$9+" : `$${plan.price}`} / month
             </h3>
           </div>
-          <Link className="button button-ghost button-compact" href="/pricing">
+          <button
+            className="button button-ghost button-compact"
+            onClick={onOpenPlanChange}
+            disabled={db.status !== "healthy"}
+          >
             Change plan
-          </Link>
+          </button>
         </div>
         <p className="settings-copy">
-          Your bill stays fixed until you explicitly change plans. Capacity alerts recommend an upgrade; they never perform one silently.
+          Your bill stays fixed until you explicitly change plans. Switching plans updates connection limits on the
+          node immediately; downgrades are blocked if you&apos;re already using more storage than the new plan allows.
         </p>
       </section>
       <section className="data-panel danger-zone">
@@ -811,11 +944,13 @@ function Settings({
           </p>
         </div>
         <div className="danger-actions">
-          <button className="button button-ghost" onClick={toggleSuspend}>
+          <button className="button button-ghost" onClick={toggleSuspend} disabled={suspending}>
+            {suspending && <span className="spinner" />}
             {db.status === "suspended" ? "Resume database" : "Suspend database"}
           </button>
-          <button className="button button-danger" onClick={deleteDatabase}>
-            <Trash2 size={14} /> Delete database
+          <button className="button button-danger" onClick={deleteDatabase} disabled={deleting}>
+            {deleting ? <span className="spinner" /> : <Trash2 size={14} />}
+            Delete database
           </button>
         </div>
       </section>
@@ -871,7 +1006,7 @@ function CreateModal({
                   <small>/mo</small>
                 </strong>
                 <em>
-                  {p.storageGb} GB · {p.connections} conns
+                  {p.storageGb} GB · {p.connections} conns · {p.isolation}
                 </em>
               </button>
             ))}
@@ -899,8 +1034,78 @@ function CreateModal({
             Cancel
           </button>
           <button className="button button-dark" disabled={creating} onClick={onCreate}>
+            {creating && <span className="spinner spinner-dark" />}
             {creating ? "Provisioning…" : "Create database"}{" "}
             {!creating && <ArrowLeft className="rotate-180" size={15} />}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PlanChangeModal({
+  currentPlan,
+  changing,
+  onClose,
+  onChange,
+}: {
+  currentPlan: PlanId;
+  changing: boolean;
+  onClose: () => void;
+  onChange: (plan: PlanId) => void;
+}) {
+  const [selected, setSelected] = useState<PlanId>(currentPlan);
+  return (
+    <div className="modal-backdrop" role="dialog" aria-modal="true">
+      <div className="create-modal">
+        <div className="modal-title">
+          <div>
+            <span className="mono section-index">CHANGE PLAN</span>
+            <h2>Pick a new plan</h2>
+          </div>
+          <button className="icon-button" onClick={onClose}>
+            <X size={16} />
+          </button>
+        </div>
+        <div className="field-label">
+          Plan
+          <div className="plan-picker">
+            {plans.slice(0, 3).map((p) => (
+              <button
+                key={p.id}
+                className={selected === p.id ? "plan-option-active" : ""}
+                onClick={() => setSelected(p.id)}
+              >
+                <span>
+                  {p.name} {p.id === currentPlan ? "· current" : ""}
+                </span>
+                <strong>
+                  ${p.price}
+                  <small>/mo</small>
+                </strong>
+                <em>
+                  {p.storageGb} GB · {p.connections} conns · {p.isolation}
+                </em>
+              </button>
+            ))}
+          </div>
+        </div>
+        <p className="settings-copy" style={{ marginTop: "14px" }}>
+          Applying immediately updates the node&apos;s connection limit for this database. Downgrading below your
+          current storage usage isn&apos;t allowed.
+        </p>
+        <div className="modal-actions">
+          <button className="button button-ghost" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            className="button button-dark"
+            disabled={changing || selected === currentPlan}
+            onClick={() => onChange(selected)}
+          >
+            {changing ? <span className="spinner spinner-dark" /> : null}
+            {changing ? "Applying…" : "Apply change"}
           </button>
         </div>
       </div>

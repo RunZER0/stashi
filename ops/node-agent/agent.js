@@ -18,6 +18,9 @@ const CONTROL_PLANE_URL = process.env.STASHI_CONTROL_PLANE_URL || "http://127.0.
 const SHARED_SECRET = process.env.STASHI_AGENT_SHARED_SECRET || "dev_stashi_secret_key";
 const POLL_INTERVAL = parseInt(process.env.STASHI_JOB_POLL_INTERVAL_SEC || "5", 10) * 1000;
 const METRICS_INTERVAL = parseInt(process.env.STASHI_METRICS_INTERVAL_SEC || "60", 10) * 1000;
+const CHECKPOINT_DIR = "/var/backups/stashi/checkpoints";
+
+const cleanIdent = (value) => String(value || "").replace(/[^a-zA-Z0-9_]/g, "");
 
 // Execute PostgreSQL commands safely via sudo -u postgres psql
 function runPsql(sql, args = []) {
@@ -33,6 +36,42 @@ function runPsql(sql, args = []) {
       }
     );
   });
+}
+
+function run(cmd, args) {
+  return new Promise((resolve, reject) => {
+    execFile(cmd, args, (error, stdout, stderr) => {
+      if (error) return reject(new Error(stderr || error.message));
+      resolve(stdout);
+    });
+  });
+}
+
+// pg_dump/pg_restore run as the postgres OS user so the file is owned by it,
+// consistent with everything else psql-related the agent does.
+function runAsPostgres(cmd, args) {
+  return new Promise((resolve, reject) => {
+    execFile("sudo", ["-u", "postgres", cmd, ...args], (error, stdout, stderr) => {
+      // pg_restore commonly exits non-zero on benign notices (e.g. "already
+      // exists" skip warnings on a fresh target). Only treat FATAL/PANIC in
+      // stderr as a real failure, same leniency ops/scripts/restore.sh uses.
+      if (error && /FATAL|PANIC/i.test(stderr || "")) {
+        return reject(new Error(stderr));
+      }
+      resolve(stdout);
+    });
+  });
+}
+
+function reloadPgbouncerAuth(roleName, scramHashOrRemove) {
+  if (!fs.existsSync("/etc/pgbouncer/userlist.txt")) return;
+  const lines = fs
+    .readFileSync("/etc/pgbouncer/userlist.txt", "utf8")
+    .split("\n")
+    .filter((l) => !l.startsWith(`"${roleName}"`));
+  if (scramHashOrRemove) lines.push(`"${roleName}" "${scramHashOrRemove}"`);
+  fs.writeFileSync("/etc/pgbouncer/userlist.txt", lines.filter(Boolean).join("\n") + "\n");
+  execFile("sudo", ["systemctl", "reload", "pgbouncer"], () => {});
 }
 
 // Generate HMAC signature for control plane requests
@@ -89,50 +128,62 @@ function postControlPlane(path, payload) {
 
 // Job Handlers
 const JobHandlers = {
-  // 1. Create Tenant Database & Role
+  // 1. Create Tenant Database & Role (isolated: Starter and up)
   async create_database({ database_name, role_name, password, connection_limit = 10 }) {
-    console.log(`[Job] Creating database: ${database_name} for role: ${role_name}`);
+    const cleanDb = cleanIdent(database_name);
+    const cleanRole = cleanIdent(role_name);
+    console.log(`[Job] Creating database: ${cleanDb} for role: ${cleanRole}`);
 
-    // Escape identifiers safely
-    const cleanDb = database_name.replace(/[^a-zA-Z0-9_]/g, "");
-    const cleanRole = role_name.replace(/[^a-zA-Z0-9_]/g, "");
-
-    // 1. Create Role with SCRAM password
     await runPsql(
       `CREATE ROLE "${cleanRole}" WITH LOGIN PASSWORD '${password.replace(/'/g, "''")}' NOSUPERUSER NOCREATEDB NOCREATEROLE CONNECTION LIMIT ${parseInt(connection_limit, 10)};`
     );
-
-    // 2. Create Database owned by Role
     await runPsql(`CREATE DATABASE "${cleanDb}" WITH OWNER = "${cleanRole}";`);
-
-    // 3. Revoke public permissions & grant explicit owner privileges
     await runPsql(`REVOKE ALL ON DATABASE "${cleanDb}" FROM PUBLIC;`);
     await runPsql(`GRANT ALL ON DATABASE "${cleanDb}" TO "${cleanRole}";`);
 
-    // 4. Update PgBouncer userlist.txt if present
     if (fs.existsSync("/etc/pgbouncer/userlist.txt")) {
       const scramHash = await runPsql(`SELECT rolpassword FROM pg_authid WHERE rolname = '${cleanRole}';`);
-      fs.appendFileSync("/etc/pgbouncer/userlist.txt", `"${cleanRole}" "${scramHash}"\n`);
-      execFile("sudo", ["systemctl", "reload", "pgbouncer"], () => {});
+      reloadPgbouncerAuth(cleanRole, scramHash);
     }
 
     return { status: "ready", database: cleanDb, role: cleanRole };
   },
 
+  // 1b. Create a pooled tenant: a schema inside the shared stashi_pool
+  // database, isolated by Postgres's own permission model rather than a
+  // dedicated instance. This is how the Dev ($1/mo) tier stays cheap.
+  async create_pool_tenant({ pool_database, schema_name, role_name, password, connection_limit = 10 }) {
+    const cleanDb = cleanIdent(pool_database);
+    const cleanSchema = cleanIdent(schema_name);
+    const cleanRole = cleanIdent(role_name);
+    console.log(`[Job] Creating pooled tenant schema: ${cleanSchema} (role ${cleanRole}) in ${cleanDb}`);
+
+    await runPsql(
+      `CREATE ROLE "${cleanRole}" WITH LOGIN PASSWORD '${password.replace(/'/g, "''")}' NOSUPERUSER NOCREATEDB NOCREATEROLE CONNECTION LIMIT ${parseInt(connection_limit, 10)};`
+    );
+    await runPsql(`GRANT CONNECT, TEMP ON DATABASE "${cleanDb}" TO "${cleanRole}";`);
+    await runPsql(`CREATE SCHEMA "${cleanSchema}" AUTHORIZATION "${cleanRole}";`, ["-d", cleanDb]);
+    // Role-level default: applied automatically on every future connection to
+    // this database, including through PgBouncer's transaction pooling
+    // (unlike a session-level SET, which pooling would not preserve).
+    await runPsql(`ALTER ROLE "${cleanRole}" IN DATABASE "${cleanDb}" SET search_path = "${cleanSchema}";`);
+
+    if (fs.existsSync("/etc/pgbouncer/userlist.txt")) {
+      const scramHash = await runPsql(`SELECT rolpassword FROM pg_authid WHERE rolname = '${cleanRole}';`);
+      reloadPgbouncerAuth(cleanRole, scramHash);
+    }
+
+    return { status: "ready", database: cleanDb, schema: cleanSchema, role: cleanRole };
+  },
+
   // 2. Rotate Credentials
   async rotate_credentials({ role_name, new_password }) {
-    const cleanRole = role_name.replace(/[^a-zA-Z0-9_]/g, "");
+    const cleanRole = cleanIdent(role_name);
     await runPsql(`ALTER ROLE "${cleanRole}" WITH PASSWORD '${new_password.replace(/'/g, "''")}';`);
 
     if (fs.existsSync("/etc/pgbouncer/userlist.txt")) {
       const scramHash = await runPsql(`SELECT rolpassword FROM pg_authid WHERE rolname = '${cleanRole}';`);
-      const lines = fs
-        .readFileSync("/etc/pgbouncer/userlist.txt", "utf8")
-        .split("\n")
-        .filter((l) => !l.startsWith(`"${cleanRole}"`));
-      lines.push(`"${cleanRole}" "${scramHash}"`);
-      fs.writeFileSync("/etc/pgbouncer/userlist.txt", lines.join("\n"));
-      execFile("sudo", ["systemctl", "reload", "pgbouncer"], () => {});
+      reloadPgbouncerAuth(cleanRole, scramHash);
     }
 
     return { status: "rotated", role: cleanRole };
@@ -140,7 +191,7 @@ const JobHandlers = {
 
   // 3. Suspend Database Access
   async suspend_database({ role_name }) {
-    const cleanRole = role_name.replace(/[^a-zA-Z0-9_]/g, "");
+    const cleanRole = cleanIdent(role_name);
     await runPsql(`ALTER ROLE "${cleanRole}" NOLOGIN;`);
     await runPsql(`SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE usename = '${cleanRole}';`);
     return { status: "suspended", role: cleanRole };
@@ -148,17 +199,16 @@ const JobHandlers = {
 
   // 4. Resume Database Access
   async resume_database({ role_name }) {
-    const cleanRole = role_name.replace(/[^a-zA-Z0-9_]/g, "");
+    const cleanRole = cleanIdent(role_name);
     await runPsql(`ALTER ROLE "${cleanRole}" LOGIN;`);
     return { status: "resumed", role: cleanRole };
   },
 
-  // 5. Delete Database
+  // 5. Delete Database (isolated)
   async delete_database({ database_name, role_name }) {
-    const cleanDb = database_name.replace(/[^a-zA-Z0-9_]/g, "");
-    const cleanRole = role_name.replace(/[^a-zA-Z0-9_]/g, "");
+    const cleanDb = cleanIdent(database_name);
+    const cleanRole = cleanIdent(role_name);
 
-    // Safety guardrail: Never delete ynai
     if (cleanDb.toLowerCase() === "ynai" || cleanRole.toLowerCase().includes("ynai")) {
       throw new Error("Safety violation: Cannot drop core production database!");
     }
@@ -166,23 +216,88 @@ const JobHandlers = {
     await runPsql(`SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${cleanDb}';`);
     await runPsql(`DROP DATABASE IF EXISTS "${cleanDb}";`);
     await runPsql(`DROP ROLE IF EXISTS "${cleanRole}";`);
-
-    if (fs.existsSync("/etc/pgbouncer/userlist.txt")) {
-      const lines = fs
-        .readFileSync("/etc/pgbouncer/userlist.txt", "utf8")
-        .split("\n")
-        .filter((l) => !l.startsWith(`"${cleanRole}"`));
-      fs.writeFileSync("/etc/pgbouncer/userlist.txt", lines.join("\n"));
-      execFile("sudo", ["systemctl", "reload", "pgbouncer"], () => {});
-    }
+    reloadPgbouncerAuth(cleanRole, null);
 
     return { status: "deleted", database: cleanDb };
+  },
+
+  // 5b. Delete a pooled tenant (drop just their schema, never the shared db)
+  async delete_pool_tenant({ pool_database, schema_name, role_name }) {
+    const cleanDb = cleanIdent(pool_database);
+    const cleanSchema = cleanIdent(schema_name);
+    const cleanRole = cleanIdent(role_name);
+
+    await runPsql(`SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE usename = '${cleanRole}';`);
+    await runPsql(`DROP SCHEMA IF EXISTS "${cleanSchema}" CASCADE;`, ["-d", cleanDb]);
+    await runPsql(`DROP ROLE IF EXISTS "${cleanRole}";`);
+    reloadPgbouncerAuth(cleanRole, null);
+
+    return { status: "deleted", schema: cleanSchema };
   },
 
   // 6. Health Probe
   async health_probe() {
     const version = await runPsql("SELECT version();");
     return { status: "healthy", version };
+  },
+
+  // 7. Resize plan (connection limit today; storage is monitored, not
+  // filesystem-enforced — see ops/plan-limits.md)
+  async resize_plan({ role_name, connection_limit }) {
+    const cleanRole = cleanIdent(role_name);
+    await runPsql(`ALTER ROLE "${cleanRole}" CONNECTION LIMIT ${parseInt(connection_limit, 10)};`);
+    return { status: "resized", role: cleanRole, connection_limit };
+  },
+
+  // 8. Create a checkpoint/backup — a real pg_dump, stored on this node.
+  // (Off-node upload to R2/S3 is a separate, not-yet-wired step; see
+  // ops/scripts/backup.sh for the same pattern once credentials exist.)
+  async create_checkpoint({ checkpoint_id, database_name, pool_database, schema_name }) {
+    const cleanCheckpoint = cleanIdent(checkpoint_id);
+    await run("sudo", ["-u", "postgres", "mkdir", "-p", CHECKPOINT_DIR]);
+    const filePath = `${CHECKPOINT_DIR}/${cleanCheckpoint}.dump`;
+
+    if (pool_database && schema_name) {
+      const cleanDb = cleanIdent(pool_database);
+      const cleanSchema = cleanIdent(schema_name);
+      await runAsPostgres("pg_dump", ["-Fc", "-n", cleanSchema, "-f", filePath, cleanDb]);
+    } else {
+      const cleanDb = cleanIdent(database_name);
+      await runAsPostgres("pg_dump", ["-Fc", "-f", filePath, cleanDb]);
+    }
+
+    await run("sudo", ["chmod", "600", filePath]);
+    const stats = fs.statSync(filePath);
+    return { status: "ready", file_path: filePath, size_bytes: stats.size };
+  },
+
+  // 9. Restore a checkpoint — wipes current state and replaces it with the
+  // snapshot. This is a rollback, not a merge: the point is an agent (or a
+  // human) can undo a bad migration in one call.
+  async restore_checkpoint({ checkpoint_id, database_name, pool_database, schema_name, role_name }) {
+    const cleanCheckpoint = cleanIdent(checkpoint_id);
+    const filePath = `${CHECKPOINT_DIR}/${cleanCheckpoint}.dump`;
+    if (!fs.existsSync(filePath)) throw new Error(`checkpoint file not found: ${filePath}`);
+    const cleanRole = cleanIdent(role_name);
+
+    if (pool_database && schema_name) {
+      const cleanDb = cleanIdent(pool_database);
+      const cleanSchema = cleanIdent(schema_name);
+      await runPsql(`SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE usename = '${cleanRole}';`);
+      await runPsql(`DROP SCHEMA IF EXISTS "${cleanSchema}" CASCADE;`, ["-d", cleanDb]);
+      await runPsql(`CREATE SCHEMA "${cleanSchema}" AUTHORIZATION "${cleanRole}";`, ["-d", cleanDb]);
+      await runAsPostgres("pg_restore", ["-d", cleanDb, filePath]);
+    } else {
+      const cleanDb = cleanIdent(database_name);
+      await runPsql(`SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${cleanDb}';`);
+      await runPsql(`DROP DATABASE IF EXISTS "${cleanDb}";`);
+      await runPsql(`CREATE DATABASE "${cleanDb}" WITH OWNER = "${cleanRole}";`);
+      await runPsql(`REVOKE ALL ON DATABASE "${cleanDb}" FROM PUBLIC;`);
+      await runPsql(`GRANT ALL ON DATABASE "${cleanDb}" TO "${cleanRole}";`);
+      await runAsPostgres("pg_restore", ["-d", cleanDb, filePath]);
+    }
+
+    return { status: "restored" };
   },
 };
 
@@ -195,7 +310,6 @@ async function collectAndSendMetrics() {
     const memoryPct = Math.round(((totalMem - freeMem) / totalMem) * 100);
     const cpuPct = Math.min(100, Math.round(loadAvg[0] * 100));
 
-    // Sample PostgreSQL databases & sizes
     const dbSizeQuery =
       "SELECT datname, pg_database_size(datname) as size_bytes FROM pg_database WHERE datistemplate = false;";
     let databases = [];
@@ -225,7 +339,6 @@ async function collectAndSendMetrics() {
 
     await postControlPlane("/api/agent/telemetry", payload);
   } catch (err) {
-    // Log softly to journal
     console.error(`[Metrics Error]: ${err.message}`);
   }
 }

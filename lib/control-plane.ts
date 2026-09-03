@@ -1,6 +1,12 @@
 import type { PlanId } from "./plans";
 
-export type DatabaseStatus = "healthy" | "provisioning" | "suspended" | "failed";
+export type DatabaseStatus = "healthy" | "provisioning" | "suspended" | "failed" | "resizing";
+
+// "isolated": its own database + role, full separation (Starter and up).
+// "pooled": a schema inside a shared database (stashi_pool), separated from
+// other tenants by Postgres's own permission model rather than a dedicated
+// instance -- how the Dev tier gets to $1/mo without losing real isolation.
+export type TenancyMode = "isolated" | "pooled";
 
 export type ManagedDatabase = {
   id: string;
@@ -19,6 +25,22 @@ export type ManagedDatabase = {
   storageUsedMb: number;
   connections: number;
   p95LatencyMs: number | null;
+  tenancyMode: TenancyMode;
+  poolSchema: string | null;
+};
+
+export type CheckpointKind = "checkpoint" | "backup";
+export type CheckpointStatus = "pending" | "ready" | "failed" | "restoring";
+
+export type Checkpoint = {
+  id: string;
+  databaseId: string;
+  kind: CheckpointKind;
+  label: string;
+  status: CheckpointStatus;
+  sizeBytes: number | null;
+  createdAt: string;
+  error?: string;
 };
 
 export type ActivityEntry = {

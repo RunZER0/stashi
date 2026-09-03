@@ -356,6 +356,69 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.db-led.resizing { background: var(--amber); box-shadow: 0 0 0 3px rgba(251, 191, 36, .2); }
+.status-pill.status-resizing { background: var(--amber-soft); border-color: rgba(251, 191, 36, 0.35); color: var(--amber); }
+
+/* Skeleton loading — never a blank screen while something is in flight */
+.skeleton {
+  background: linear-gradient(90deg, #131713 25%, #1b211b 37%, #131713 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease infinite;
+}
+.skeleton-row { height: 14px; border-radius: 2px; }
+.skeleton-block { border-radius: 2px; }
+
+.spinner {
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgba(255,255,255,.18);
+  border-top-color: var(--green);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  display: inline-block;
+  flex: 0 0 auto;
+}
+.spinner.spinner-dark {
+  border: 2px solid rgba(8,9,8,.2);
+  border-top-color: #080908;
+}
+
+/* SQL editor */
+.sql-editor-shell { border: 1px solid var(--line-dark); background: #0e110e; overflow: hidden; }
+.sql-editor-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 9px 14px; border-bottom: 1px solid var(--line); background: #0a0c0a; gap: 12px; flex-wrap: wrap; }
+.sql-editor-hint { font-size: 9px; color: var(--muted); font-family: "SFMono-Regular", Consolas, monospace; }
+.sql-editor-cm { font-size: 12px; }
+.sql-editor-cm .cm-editor { background: #0a0c0a !important; }
+.sql-editor-cm .cm-gutters { background: #0a0c0a !important; border-right: 1px solid var(--line) !important; }
+.sql-editor-cm .cm-scroller { font-family: "SFMono-Regular", Consolas, monospace !important; }
+.sql-results { border-top: 1px solid var(--line); min-height: 160px; }
+.sql-results-empty { padding: 40px 20px; text-align: center; color: var(--muted); font-size: 12px; }
+.sql-results-error { padding: 16px; background: var(--red-soft); color: var(--red); font-size: 12px; font-family: "SFMono-Regular", Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
+.sql-results-meta { display: flex; justify-content: space-between; padding: 8px 14px; border-bottom: 1px solid var(--line); font-size: 9px; color: var(--muted); font-family: "SFMono-Regular", Consolas, monospace; background: #0c0e0c; }
+.sql-results-table-wrap { overflow: auto; max-height: 420px; }
+.sql-results-table { width: 100%; border-collapse: collapse; font-size: 11px; font-family: "SFMono-Regular", Consolas, monospace; }
+.sql-results-table th { position: sticky; top: 0; text-align: left; padding: 8px 12px; background: #131713; color: var(--muted); font-weight: 700; border-bottom: 1px solid var(--line-dark); white-space: nowrap; }
+.sql-results-table td { padding: 7px 12px; border-bottom: 1px solid var(--line); color: var(--ink-2); white-space: nowrap; max-width: 320px; overflow: hidden; text-overflow: ellipsis; }
+.sql-results-table tr:hover td { background: #101410; }
+.sql-history { display: flex; flex-direction: column; gap: 1px; max-height: 260px; overflow-y: auto; }
+.sql-history button { text-align: left; border: 0; background: #0e110e; color: var(--ink-2); padding: 9px 12px; font: 10px/1.4 "SFMono-Regular", Consolas, monospace; cursor: pointer; border-bottom: 1px solid var(--line); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sql-history button:hover { background: #141814; color: var(--ink); }
+
+/* Checkpoints */
+.checkpoint-row { display: grid; grid-template-columns: 1fr 110px 90px 130px; gap: 10px; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--line); font-size: 10px; }
+.checkpoint-row:last-child { border-bottom: 0; }
+.checkpoint-kind { display: inline-flex; align-items: center; gap: 5px; font: 700 8px/1 "SFMono-Regular", monospace; letter-spacing: .04em; padding: 4px 6px; border: 1px solid var(--line-dark); color: var(--muted); width: fit-content; }
+.checkpoint-kind.kind-backup { color: var(--green); border-color: rgba(52,211,153,.35); }
+
 @keyframes pulseGlow {
   0%, 100% { box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.15); }
   50% { box-shadow: 0 0 12px 3px rgba(52, 211, 153, 0.35); }

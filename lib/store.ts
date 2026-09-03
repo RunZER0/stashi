@@ -1,7 +1,15 @@
 import { randomBytes } from "node:crypto";
 import { ensureSchema, getPool } from "./db";
-import type { ActivityEntry, AgentJob, AgentJobStatus, ManagedDatabase, Node } from "./control-plane";
-import type { PlanId } from "./plans";
+import type {
+  ActivityEntry,
+  AgentJob,
+  AgentJobStatus,
+  Checkpoint,
+  CheckpointKind,
+  ManagedDatabase,
+  Node,
+} from "./control-plane";
+import { getPlan, type PlanId } from "./plans";
 
 // Real Postgres-backed control plane. See lib/db.ts for why: this used to be
 // a JSON file on local disk, which only worked as a stopgap — it doesn't
@@ -10,6 +18,12 @@ import type { PlanId } from "./plans";
 // runs customer databases) sitting idle for this purpose.
 
 const DEFAULT_NODE_ID = "node-nj-01";
+
+// Every Dev-tier ("pooled") tenant lives as its own schema inside this one
+// shared database, isolated by Postgres's own permission model (own schema,
+// own role, default-deny on everyone else's) rather than a dedicated
+// database — that's how the $1/mo tier stays cheap without losing isolation.
+export const POOL_DATABASE = "stashi_pool";
 
 const slugify = (value: string) =>
   value
@@ -36,6 +50,8 @@ function rowToDatabase(row: any): ManagedDatabase {
     storageUsedMb: row.storage_used_mb,
     connections: row.connections,
     p95LatencyMs: row.p95_latency_ms,
+    tenancyMode: row.tenancy_mode,
+    poolSchema: row.pool_schema,
   };
 }
 
@@ -78,6 +94,19 @@ function rowToJob(row: any): AgentJob {
   };
 }
 
+function rowToCheckpoint(row: any): Checkpoint {
+  return {
+    id: row.id,
+    databaseId: row.database_id,
+    kind: row.kind,
+    label: row.label,
+    status: row.status,
+    sizeBytes: row.size_bytes === null ? null : Number(row.size_bytes),
+    createdAt: row.created_at.toISOString(),
+    error: row.error ?? undefined,
+  };
+}
+
 const newId = (prefix: string) => `${prefix}_${Date.now().toString(36)}${randomBytes(3).toString("hex")}`;
 
 async function pushActivity(email: string, actor: string, action: string, target: string) {
@@ -108,8 +137,9 @@ export async function getDatabase(email: string, id: string): Promise<ManagedDat
 
 // Creates the database record in "provisioning" state and enqueues the real
 // job for the node agent to execute. The record only flips to "healthy" once
-// completeJob() processes a successful create_database result — see
-// app/api/agent/jobs/complete/route.ts.
+// completeJob() processes a successful result — see
+// app/api/agent/jobs/complete/route.ts. Dev-tier plans provision into the
+// shared pool (schema isolation); everything else gets its own database.
 export async function createDatabase(
   email: string,
   input: { name: string; plan: PlanId; region: string }
@@ -120,27 +150,52 @@ export async function createDatabase(
 
   const safeName = slugify(input.name);
   const suffix = randomBytes(3).toString("hex");
-  const roleName = `st_${safeName}_${suffix}`;
-  const dbName = `st_${safeName}_${suffix}`;
   const password = `st_${randomBytes(12).toString("base64url")}`;
   const id = newId("db").toUpperCase();
   const apiKey = `st_live_${randomBytes(9).toString("hex")}`;
   const host = process.env.NEXT_PUBLIC_DB_HOST || "db.stashi.dev";
   const port = Number(process.env.NEXT_PUBLIC_DB_PORT || 6432);
   const name = input.name.trim() || "database";
+  const plan = getPlan(input.plan);
+  const pooled = input.plan === "dev";
+
+  const roleName = pooled ? `st_pool_${safeName}_${suffix}` : `st_${safeName}_${suffix}`;
+  const dbNameOrSchema = pooled ? `t_${safeName}_${suffix}` : `st_${safeName}_${suffix}`;
 
   await pool.query(
-    `INSERT INTO databases (id, owner_email, name, plan, region, status, version, host, port, database_name, username, password, api_key)
-     VALUES ($1,$2,$3,$4,$5,'provisioning','17',$6,$7,$8,$9,$10,$11)`,
-    [id, email, name, input.plan, input.region || "us-east", host, port, dbName, roleName, password, apiKey]
+    `INSERT INTO databases (id, owner_email, name, plan, region, status, version, host, port, database_name, username, password, api_key, tenancy_mode, pool_schema)
+     VALUES ($1,$2,$3,$4,$5,'provisioning','17',$6,$7,$8,$9,$10,$11,$12,$13)`,
+    [
+      id,
+      email,
+      name,
+      input.plan,
+      input.region || "us-east",
+      host,
+      port,
+      pooled ? POOL_DATABASE : dbNameOrSchema,
+      roleName,
+      password,
+      apiKey,
+      pooled ? "pooled" : "isolated",
+      pooled ? dbNameOrSchema : null,
+    ]
   );
 
   const jobId = newId("job");
-  const payload = { database_name: dbName, role_name: roleName, password, connection_limit: 10 };
+  const payload = pooled
+    ? {
+        pool_database: POOL_DATABASE,
+        schema_name: dbNameOrSchema,
+        role_name: roleName,
+        password,
+        connection_limit: plan.connections,
+      }
+    : { database_name: dbNameOrSchema, role_name: roleName, password, connection_limit: plan.connections };
   await pool.query(
     `INSERT INTO jobs (id, node_id, type, payload, status, owner_email, database_id)
-     VALUES ($1,$2,'create_database',$3,'pending',$4,$5)`,
-    [jobId, DEFAULT_NODE_ID, JSON.stringify(payload), email, id]
+     VALUES ($1,$2,$3,$4,'pending',$5,$6)`,
+    [jobId, DEFAULT_NODE_ID, pooled ? "create_pool_tenant" : "create_database", JSON.stringify(payload), email, id]
   );
 
   await pushActivity(email, "you", "database.provisioning.queued", name);
@@ -191,13 +246,57 @@ export async function deleteDatabase(email: string, id: string): Promise<Managed
   const target = rows[0] ? rowToDatabase(rows[0]) : null;
   if (!target) return null;
 
+  const payload =
+    target.tenancyMode === "pooled"
+      ? { pool_database: POOL_DATABASE, schema_name: target.poolSchema, role_name: target.username }
+      : { database_name: target.database, role_name: target.username };
   await pool.query(
     `INSERT INTO jobs (id, node_id, type, payload, status, owner_email, database_id)
-     VALUES ($1,$2,'delete_database',$3,'pending',$4,$5)`,
-    [newId("job"), DEFAULT_NODE_ID, JSON.stringify({ database_name: target.database, role_name: target.username }), email, id]
+     VALUES ($1,$2,$3,$4,'pending',$5,$6)`,
+    [newId("job"), DEFAULT_NODE_ID, target.tenancyMode === "pooled" ? "delete_pool_tenant" : "delete_database", JSON.stringify(payload), email, id]
   );
   await pushActivity(email, "you", "database.deleted", target.name);
   return target;
+}
+
+// Changes a database's plan. Validates the downgrade against current usage,
+// enqueues a real resize job (connection limit today; storage quota
+// enforcement is monitored, not filesystem-enforced -- see ops/plan-limits.md),
+// and only applies the new plan once the agent confirms it, same pattern as
+// create/delete.
+export async function requestPlanChange(
+  email: string,
+  id: string,
+  newPlan: PlanId
+): Promise<{ database: ManagedDatabase; job: AgentJob }> {
+  await ensureSchema();
+  const pool = getPool();
+  const current = await getDatabase(email, id);
+  if (!current) throw new Error("not_found");
+  if (current.plan === newPlan) throw new Error("already_on_plan");
+  if (current.status !== "healthy") throw new Error("database_not_ready");
+
+  const target = getPlan(newPlan);
+  if (current.storageUsedMb > target.storageGb * 1024) {
+    throw new Error(
+      `Can't switch to ${target.name}: this database is using ${current.storageUsedMb} MB, over the ${target.storageGb} GB limit on that plan.`
+    );
+  }
+
+  await pool.query(`UPDATE databases SET status = 'resizing' WHERE owner_email = $1 AND id = $2`, [email, id]);
+
+  const jobId = newId("job");
+  const payload = { role_name: current.username, new_plan: newPlan, connection_limit: target.connections };
+  await pool.query(
+    `INSERT INTO jobs (id, node_id, type, payload, status, owner_email, database_id)
+     VALUES ($1,$2,'resize_plan',$3,'pending',$4,$5)`,
+    [jobId, DEFAULT_NODE_ID, JSON.stringify(payload), email, id]
+  );
+  await pushActivity(email, "you", "database.plan_change.queued", `${current.plan} → ${newPlan}`);
+
+  const database = (await getDatabase(email, id))!;
+  const { rows } = await pool.query(`SELECT * FROM jobs WHERE id = $1`, [jobId]);
+  return { database, job: rowToJob(rows[0]) };
 }
 
 export async function listActivity(email: string): Promise<ActivityEntry[]> {
@@ -245,6 +344,91 @@ export async function recordNodeTelemetry(nodeId: string, patch: Partial<Node>) 
   return rows[0] ? rowToNode(rows[0]) : null;
 }
 
+// --- Checkpoints & backups (one real mechanism, two labels) ----------------
+
+export async function listCheckpoints(databaseId: string): Promise<Checkpoint[]> {
+  await ensureSchema();
+  const { rows } = await getPool().query(
+    `SELECT * FROM checkpoints WHERE database_id = $1 ORDER BY created_at DESC LIMIT 50`,
+    [databaseId]
+  );
+  return rows.map(rowToCheckpoint);
+}
+
+export async function createCheckpoint(
+  email: string,
+  databaseId: string,
+  kind: CheckpointKind,
+  label: string,
+  actor: string = "you"
+): Promise<{ checkpoint: Checkpoint; job: AgentJob }> {
+  await ensureSchema();
+  const pool = getPool();
+  const db = await getDatabase(email, databaseId);
+  if (!db) throw new Error("not_found");
+  if (db.status !== "healthy") throw new Error("database_not_ready");
+
+  const checkpointId = newId("cp");
+  await pool.query(
+    `INSERT INTO checkpoints (id, database_id, owner_email, kind, label, status) VALUES ($1,$2,$3,$4,$5,'pending')`,
+    [checkpointId, databaseId, email, kind, label]
+  );
+
+  const jobId = newId("job");
+  const payload =
+    db.tenancyMode === "pooled"
+      ? { checkpoint_id: checkpointId, pool_database: POOL_DATABASE, schema_name: db.poolSchema }
+      : { checkpoint_id: checkpointId, database_name: db.database };
+  await pool.query(
+    `INSERT INTO jobs (id, node_id, type, payload, status, owner_email, database_id)
+     VALUES ($1,$2,'create_checkpoint',$3,'pending',$4,$5)`,
+    [jobId, DEFAULT_NODE_ID, JSON.stringify(payload), email, databaseId]
+  );
+  await pushActivity(email, actor, kind === "backup" ? "backup.queued" : "checkpoint.queued", label);
+
+  const { rows: cpRows } = await pool.query(`SELECT * FROM checkpoints WHERE id = $1`, [checkpointId]);
+  const { rows: jobRows } = await pool.query(`SELECT * FROM jobs WHERE id = $1`, [jobId]);
+  return { checkpoint: rowToCheckpoint(cpRows[0]), job: rowToJob(jobRows[0]) };
+}
+
+export async function restoreCheckpoint(
+  email: string,
+  databaseId: string,
+  checkpointId: string,
+  actor: string = "you"
+): Promise<{ job: AgentJob }> {
+  await ensureSchema();
+  const pool = getPool();
+  const db = await getDatabase(email, databaseId);
+  if (!db) throw new Error("not_found");
+
+  const { rows: cpRows } = await pool.query(
+    `SELECT * FROM checkpoints WHERE id = $1 AND database_id = $2`,
+    [checkpointId, databaseId]
+  );
+  const checkpoint = cpRows[0] ? rowToCheckpoint(cpRows[0]) : null;
+  if (!checkpoint) throw new Error("checkpoint_not_found");
+  if (checkpoint.status !== "ready") throw new Error("checkpoint_not_ready");
+
+  await pool.query(`UPDATE checkpoints SET status = 'restoring' WHERE id = $1`, [checkpointId]);
+  await pool.query(`UPDATE databases SET status = 'resizing' WHERE owner_email = $1 AND id = $2`, [email, databaseId]);
+
+  const jobId = newId("job");
+  const payload =
+    db.tenancyMode === "pooled"
+      ? { checkpoint_id: checkpointId, pool_database: POOL_DATABASE, schema_name: db.poolSchema, role_name: db.username }
+      : { checkpoint_id: checkpointId, database_name: db.database, role_name: db.username };
+  await pool.query(
+    `INSERT INTO jobs (id, node_id, type, payload, status, owner_email, database_id)
+     VALUES ($1,$2,'restore_checkpoint',$3,'pending',$4,$5)`,
+    [jobId, DEFAULT_NODE_ID, JSON.stringify(payload), email, databaseId]
+  );
+  await pushActivity(email, actor, "checkpoint.restore.queued", checkpoint.label);
+
+  const { rows: jobRows } = await pool.query(`SELECT * FROM jobs WHERE id = $1`, [jobId]);
+  return { job: rowToJob(jobRows[0]) };
+}
+
 // --- Agent job queue -------------------------------------------------------
 
 export async function enqueueJob(
@@ -283,6 +467,8 @@ export async function claimNextJob(nodeId: string): Promise<AgentJob | null> {
   return rows[0] ? rowToJob(rows[0]) : null;
 }
 
+const DATABASE_STATUS_JOB_TYPES = new Set(["create_database", "create_pool_tenant", "resize_plan", "restore_checkpoint"]);
+
 export async function completeJob(
   jobId: string,
   status: AgentJobStatus,
@@ -299,11 +485,54 @@ export async function completeJob(
   const job = rows[0] ? rowToJob(rows[0]) : null;
   if (!job) return null;
 
-  if (job.type === "create_database") {
+  const ok = status === "completed";
+
+  if (job.type === "create_database" || job.type === "create_pool_tenant") {
     await pool.query(`UPDATE databases SET status = $3 WHERE owner_email = $1 AND id = $2`, [
       job.ownerEmail,
       job.databaseId,
-      status === "completed" ? "healthy" : "failed",
+      ok ? "healthy" : "failed",
+    ]);
+  }
+
+  if (job.type === "resize_plan") {
+    if (ok) {
+      await pool.query(`UPDATE databases SET status = 'healthy', plan = $3 WHERE owner_email = $1 AND id = $2`, [
+        job.ownerEmail,
+        job.databaseId,
+        job.payload.new_plan,
+      ]);
+    } else {
+      await pool.query(`UPDATE databases SET status = 'healthy' WHERE owner_email = $1 AND id = $2`, [
+        job.ownerEmail,
+        job.databaseId,
+      ]);
+    }
+  }
+
+  if (job.type === "create_checkpoint") {
+    const checkpointId = job.payload.checkpoint_id as string;
+    if (ok) {
+      await pool.query(`UPDATE checkpoints SET status = 'ready', size_bytes = $2, file_path = $3 WHERE id = $1`, [
+        checkpointId,
+        result?.size_bytes ?? null,
+        result?.file_path ?? null,
+      ]);
+    } else {
+      await pool.query(`UPDATE checkpoints SET status = 'failed', error = $2 WHERE id = $1`, [
+        checkpointId,
+        error ?? "unknown error",
+      ]);
+    }
+  }
+
+  if (job.type === "restore_checkpoint") {
+    const checkpointId = job.payload.checkpoint_id as string;
+    await pool.query(`UPDATE checkpoints SET status = 'ready' WHERE id = $1`, [checkpointId]);
+    await pool.query(`UPDATE databases SET status = $3 WHERE owner_email = $1 AND id = $2`, [
+      job.ownerEmail,
+      job.databaseId,
+      ok ? "healthy" : "failed",
     ]);
   }
 
@@ -313,12 +542,7 @@ export async function completeJob(
   ]);
   const targetName = dbRows[0]?.name;
   if (targetName) {
-    await pushActivity(
-      job.ownerEmail,
-      "node-agent",
-      status === "completed" ? `${job.type}.completed` : `${job.type}.failed`,
-      targetName
-    );
+    await pushActivity(job.ownerEmail, "node-agent", ok ? `${job.type}.completed` : `${job.type}.failed`, targetName);
   }
 
   return job;
