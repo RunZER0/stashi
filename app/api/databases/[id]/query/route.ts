@@ -26,15 +26,21 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   // role — exactly the same access they already have via psql or their app.
   // No extra SQL restrictions needed beyond a timeout and a row cap, which
   // protect the API/browser, not a security boundary.
+  //
+  // statement_timeout is applied as a `SET` query after connecting, not as a
+  // pg.Client startup-packet option: PgBouncer in transaction-pooling mode
+  // only allows a fixed allowlist of startup parameters and rejects
+  // anything else outright (confirmed live — "unsupported startup
+  // parameter: statement_timeout" from PgBouncer itself, not Postgres).
   const client = new Client({
     connectionString: makeConnectionString(db),
     connectionTimeoutMillis: 8000,
-    statement_timeout: STATEMENT_TIMEOUT_MS,
   });
 
   const startedAt = Date.now();
   try {
     await client.connect();
+    await client.query(`SET statement_timeout = ${STATEMENT_TIMEOUT_MS}`);
     const result = await client.query(sql);
     const durationMs = Date.now() - startedAt;
 
