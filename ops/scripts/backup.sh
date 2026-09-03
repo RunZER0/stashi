@@ -26,7 +26,7 @@ mkdir -p "$BACKUP_DIR"
 chmod 700 "$BACKUP_DIR"
 
 echo "==> [1/5] Starting pg_dump for database: ${DB_NAME}..."
-sudo -u postgres pg_dump -Fc -Z 6 -f "$BACKUP_FILE" "$DB_NAME"
+sudo -u postgres pg_dump -Fc --compress=zstd:3 -f "$BACKUP_FILE" "$DB_NAME"
 
 if [[ ! -s "$BACKUP_FILE" ]]; then
   echo "ERROR: Backup file ${BACKUP_FILE} is empty or missing."

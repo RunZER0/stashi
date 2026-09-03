@@ -271,13 +271,17 @@ const JobHandlers = {
     await run("chown", ["-R", "postgres:postgres", "/var/backups/stashi"]);
     const filePath = `${CHECKPOINT_DIR}/${cleanCheckpoint}.dump`;
 
+    // zstd:3 standardized across every dump this agent produces (confirmed
+    // this PG17 build has libzstd and accepts --compress=zstd:3 before
+    // relying on it). Never re-compress on top of this before the B2 upload
+    // below -- it's already compressed.
     if (pool_database && schema_name) {
       const cleanDb = cleanIdent(pool_database);
       const cleanSchema = cleanIdent(schema_name);
-      await runAsPostgres("pg_dump", ["-Fc", "-n", cleanSchema, "-f", filePath, cleanDb]);
+      await runAsPostgres("pg_dump", ["-Fc", "--compress=zstd:3", "-n", cleanSchema, "-f", filePath, cleanDb]);
     } else {
       const cleanDb = cleanIdent(database_name);
-      await runAsPostgres("pg_dump", ["-Fc", "-f", filePath, cleanDb]);
+      await runAsPostgres("pg_dump", ["-Fc", "--compress=zstd:3", "-f", filePath, cleanDb]);
     }
 
     await run("sudo", ["chmod", "600", filePath]);
