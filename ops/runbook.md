@@ -18,6 +18,8 @@ Real work completed against the live node, verified (not simulated):
   - `create_checkpoint`'s `mkdir` ran as the `postgres` OS user, which doesn't own `/var/backups` (the parent dir) and can't create a subdirectory there. Create it as root (the agent's own privilege) and `chown` it to `postgres` so `pg_dump` can write into it.
   - `delete_pool_tenant`'s `DROP ROLE` failed because `create_pool_tenant`'s `GRANT CONNECT ON DATABASE` is a real dependency that has to be `REVOKE`d first — Postgres refuses to drop a role with outstanding privileges on a database.
 - **Per-tenant storage/connection sampling is not wired yet** — only node-level CPU/mem/disk telemetry exists. Each database's `storageUsedMb`/`connections` fields are real columns, honestly starting at 0, but nothing updates them yet. Console downgrade protection and the storage bar are running on that placeholder until this is built.
+- **PITR / continuous WAL archiving (2026-09-03):** pgBackRest 2.59.1 installed and configured against the same B2 bucket used for off-node checkpoint uploads (`stashi-backups`, prefixed under `/pgbackrest`, separate from the `off-node checkpoint` dump objects). Config lives at `/etc/pgbackrest.conf` on the node (template: `ops/pgbackrest/pgbackrest.conf.example` — real file is not committed, has live B2 keys) and `/etc/postgresql/17/main/conf.d/zz-pgbackrest.conf` (committed template: `ops/pgbackrest/zz-pgbackrest.conf`). `archive_mode=on` requires a full restart (`PGC_POSTMASTER`); this was done live against the `ynai` production cluster with a fresh verified `pg_dump` safety-net taken first, `pg_reload_conf()` used to validate config syntax pre-restart, and `ynai` size/table-count verified unchanged immediately after. **Hit and fixed a real bug**: pgBackRest's `compress-type` option uses the short form `zst`, not `zstd` (the spelling `pg_dump --compress=zstd:3` uses) — the wrong value caused `archive-push` to fail with error `[032]` on 3 WAL segments before the fix; PostgreSQL's own archiver auto-retried and self-healed once corrected, no manual WAL recovery was needed. Verified end-to-end: `pgbackrest check` passes, `pg_stat_archiver` shows fresh `archived_count`/`last_archived_time` after a forced `pg_switch_wal()`, and the WAL objects are confirmed present in the B2 bucket by direct `aws s3 ls`. First full base backup (`pgbackrest --stanza=main --type=full backup`) ran immediately after: 5.2GB database, 3.4GB compressed, confirmed present in B2 (46 objects under the backup set incl. `backup.manifest`), verified via `pgbackrest info`. Daily/weekly systemd timers deployed and enabled (`pgbackrest-incr.timer` Mon-Sat 02:00, `pgbackrest-full.timer` Sun 02:00).
+  - **Restore drill: attempted, blocked, not yet verified.** Restoring the 5.2GB backup to an isolated `restore_test` data directory consumed enough B2 download bandwidth to hit the account's **Caps & Alerts** limit on Class B (download) transactions — a spending guardrail on the Backblaze account, not a bug in the pgBackRest setup itself (`AccessDenied: ... download bandwidth or transaction (Class B) cap exceeded`). Raising it permanently requires adding a credit card to the B2 account, which was declined for now. B2's Class B cap resets daily, so this should clear on its own; the `restore_test` directory was cleaned up and `ynai` was verified untouched throughout. **Action needed before this restore path can be trusted:** re-run the restore drill (Phase 7, step 6 below / `ops/rollback-procedure.md` Section 5) after the daily reset and confirm it completes. Until that drill passes, treat physical PITR restore as unverified even though archiving/backup are confirmed working.
 
 ---
 
@@ -165,3 +167,73 @@ chmod +x ops/scripts/verify-node.sh
 ./ops/scripts/verify-node.sh
 ```
 All 15 tests must pass before the node is certified for production traffic.
+
+---
+
+## Phase 7 — Continuous WAL Archiving & PITR (pgBackRest)
+
+This is separate from the logical `.dump` checkpoint system (`ops/scripts/backup.sh`, `create_checkpoint` job) — that facility remains the per-tenant, on-demand "save point" mechanism surfaced in the console. pgBackRest provides physical, cluster-wide continuous archiving so any point in time can be recovered, not just discrete checkpoints.
+
+1. **Install & configure (one-time):**
+   ```bash
+   sudo apt-get install -y pgbackrest
+   sudo cp ops/pgbackrest/pgbackrest.conf.example /etc/pgbackrest.conf
+   # edit /etc/pgbackrest.conf: fill in repo1-s3-key / repo1-s3-key-secret from the secret store
+   sudo chown postgres:postgres /etc/pgbackrest.conf
+   sudo chmod 640 /etc/pgbackrest.conf
+   sudo mkdir -p /var/log/pgbackrest && sudo chown postgres:postgres /var/log/pgbackrest
+   sudo cp ops/pgbackrest/zz-pgbackrest.conf /etc/postgresql/17/main/conf.d/zz-pgbackrest.conf
+   sudo chown postgres:postgres /etc/postgresql/17/main/conf.d/zz-pgbackrest.conf
+   sudo -u postgres pgbackrest --stanza=main stanza-create
+   ```
+
+   **`compress-type` must be `zst`, not `zstd`.** pgBackRest's allowed values are `none | bz2 | gz | lz4 | zst`. This is a different spelling convention from `pg_dump --compress=zstd:N` used elsewhere in this repo — do not unify them, they are genuinely different flags on different tools.
+
+2. **Apply `archive_mode=on` (restart required):**
+   `archive_mode` is `PGC_POSTMASTER` — a reload is not enough. Before restarting:
+   ```bash
+   # validate config syntax without restarting (archive_mode won't take effect yet)
+   sudo -u postgres psql -Atc "select pg_reload_conf();"
+   sudo -u postgres psql -Atc "select name, setting, pending_restart from pg_settings where name in ('archive_mode','archive_command');"
+   # take a fresh verified safety-net dump before the restart
+   # then:
+   sudo systemctl restart postgresql@17-main
+   sudo -u postgres psql -Atc "show archive_mode;"
+   ```
+   Verify the production database(s) are unchanged immediately after (size, table count) and that PgBouncer/app connections re-establish.
+
+3. **Verify archiving is actually working — do not trust exit code alone:**
+   ```bash
+   sudo -u postgres pgbackrest --stanza=main check
+   sudo -u postgres psql -Atc "select pg_switch_wal();"
+   sudo -u postgres psql -Atc "select archived_count, failed_count, last_archived_wal, last_archived_time, last_failed_wal from pg_stat_archiver;"
+   # confirm the object actually landed in B2:
+   aws s3 ls s3://stashi-backups/pgbackrest/archive/main/17-1/<timeline-segment-prefix>/ --endpoint-url https://s3.us-east-005.backblazeb2.com
+   ```
+   `last_archived_time` should be recent and `archived_count` should have incremented since the forced switch. `failed_count`/`last_failed_wal` are cumulative and won't reset on their own — a fix is confirmed by new successes accumulating, not by the failure counter clearing.
+
+4. **First full base backup:**
+   ```bash
+   sudo -u postgres pgbackrest --stanza=main --type=full backup
+   sudo -u postgres pgbackrest --stanza=main info
+   ```
+
+5. **Backup schedule:** full backup weekly (Sunday 02:00) plus daily incrementals (Mon-Sat 02:00), via systemd timers (preferred over cron for logging/journalctl integration):
+   ```bash
+   sudo cp ops/pgbackrest/pgbackrest-full.service ops/pgbackrest/pgbackrest-full.timer \
+          ops/pgbackrest/pgbackrest-incr.service ops/pgbackrest/pgbackrest-incr.timer \
+          /etc/systemd/system/
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now pgbackrest-full.timer pgbackrest-incr.timer
+   systemctl list-timers | grep pgbackrest
+   ```
+
+6. **Restore drills:** always restore to an isolated location (a scratch directory / spare stanza), never in place on the live cluster:
+   ```bash
+   sudo -u postgres pgbackrest --stanza=main --type=time --target="<timestamp>" --pg1-path=/var/lib/postgresql/17/restore_test restore
+   ```
+   Confirm the restored cluster starts and the expected data is present before considering a restore path trustworthy.
+
+   **Known constraint (2026-09-03):** a full restore of this node's ~5.2GB database consumes enough B2 download bandwidth to trip the account's Caps & Alerts Class B (download) limit, which aborts the restore mid-recovery (fails to fetch `archive.info`/WAL). This is a Backblaze account spending guardrail, not a pgBackRest defect — raising the cap permanently needs a credit card on the B2 account (declined for now). The cap resets daily. Before trusting this restore path (and before any real disaster recovery), re-run a restore drill after the daily reset and confirm it completes and the throwaway instance starts and serves correct data (see `ops/rollback-procedure.md` Section 5 for the full drill + verification steps). If restores remain a recurring need, either add the card to raise the cap, or budget for the (small, non-recurring) per-restore download cost.
+
+7. **Retention:** `repo1-retention-full=7` currently applies bucket-wide (7 full backups retained). The product spec calls for plan-aware retention (Dev ~1 day, Starter ~3 days, Production ~7 days, larger tiers 14-30+ days) — a single shared stanza/retention policy does not yet support per-tenant retention tiers. This node currently hosts one physical cluster (`ynai` + Stashi tenants sharing it), so today's retention setting is a node-wide policy, not yet a per-plan one. Revisit if/when tenants get dedicated clusters.

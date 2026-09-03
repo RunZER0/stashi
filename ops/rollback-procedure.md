@@ -94,3 +94,38 @@ sudo -u postgres pg_restore -v -d ynai_restored -j 2 /tmp/ynai_restore.dump
 # 5. Verify row count and table integrity
 sudo -u postgres psql -d ynai_restored -c "ANALYZE; SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';"
 ```
+
+This path restores from a discrete logical `.dump` checkpoint and is best for restoring a single tenant/database to a known save point. It cannot recover to an arbitrary point in time between backups — for that, use Section 5.
+
+---
+
+## 5. Point-in-Time Recovery (pgBackRest)
+
+Use this when the need is "restore to 3:47pm yesterday" rather than "restore to the last checkpoint." See `ops/runbook.md` Phase 7 for setup. **Never restore in place on the live cluster** — always restore to an isolated path first, verify, then only promote if this is an actual disaster-recovery event (not a drill).
+
+```bash
+# 1. Confirm backup history and available recovery window
+sudo -u postgres pgbackrest --stanza=main info
+
+# 2. Restore to an isolated directory, targeting a specific time
+sudo -u postgres pgbackrest --stanza=main --type=time \
+  --target="2026-09-03 14:00:00+00" \
+  --pg1-path=/var/lib/postgresql/17/restore_test \
+  restore
+
+# 3. Start a throwaway PostgreSQL instance against the restored data directory
+#    on a different port to inspect it before trusting/promoting it
+sudo -u postgres /usr/lib/postgresql/17/bin/pg_ctl -D /var/lib/postgresql/17/restore_test \
+  -o "-p 5433" -l /tmp/restore_test.log start
+
+# 4. Verify expected data is present
+psql -h 127.0.0.1 -p 5433 -U postgres -d ynai -c "SELECT count(*) FROM pg_tables WHERE schemaname='public';"
+
+# 5. Tear down the drill instance — do not leave it running
+sudo -u postgres /usr/lib/postgresql/17/bin/pg_ctl -D /var/lib/postgresql/17/restore_test stop
+sudo rm -rf /var/lib/postgresql/17/restore_test
+```
+
+Only after a restore is verified against an isolated instance should promotion to the live path (stopping the real cluster, swapping data directories) even be considered, and only for an actual incident — not a routine drill.
+
+**Status (2026-09-03): this drill has not yet passed.** A first attempt hit the B2 account's Caps & Alerts Class B (download) limit partway through recovery — restoring ~5.2GB used up the daily download allowance, and the subsequent `archive.info` fetch was rejected with `AccessDenied ... cap exceeded`. The cap resets daily; permanently raising it needs a credit card on the B2 account, which was declined for now. `ynai` and the live cluster were unaffected (this only touches the isolated `restore_test` path). **Do not treat PITR restore as trustworthy until this drill is re-run after the reset and passes.**

@@ -1,0 +1,33 @@
+# /etc/pgbackrest.conf on the production node.
+# Real file has 640 perms, owner postgres:postgres, and is NOT committed
+# (contains the B2 access key/secret). Copy this template and fill in
+# repo1-s3-key / repo1-s3-key-secret from the node's secret store.
+#
+# NOTE: pgBackRest's compress-type values are the SHORT form:
+#   none | bz2 | gz | lz4 | zst
+# This is NOT the same spelling as pg_dump's --compress=zstd:N flag used
+# by the logical-dump path in ops/node-agent/agent.js and
+# ops/scripts/backup.sh. Do not "fix" this to zstd - zstd is invalid here
+# and archive-push will fail with error [032].
+
+[global]
+repo1-type=s3
+repo1-s3-bucket=stashi-backups
+repo1-s3-endpoint=s3.us-east-005.backblazeb2.com
+repo1-s3-region=us-east-005
+repo1-s3-key=REPLACE_WITH_B2_KEY_ID
+repo1-s3-key-secret=REPLACE_WITH_B2_APPLICATION_KEY
+repo1-path=/pgbackrest
+repo1-retention-full=7
+repo1-bundle=y
+repo1-block=y
+compress-type=zst
+compress-level=3
+process-max=2
+start-fast=y
+log-level-console=info
+log-level-file=detail
+
+[main]
+pg1-path=/var/lib/postgresql/17/main
+pg1-port=5432

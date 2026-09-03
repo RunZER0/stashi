@@ -1,0 +1,13 @@
+# Runs the daily incremental backup every day at 02:00 server time, except
+# Sunday (the full-backup timer covers that day instead).
+# Install to /etc/systemd/system/, then: systemctl enable --now pgbackrest-incr.timer
+[Unit]
+Description=Daily schedule for Stashi pgBackRest incremental backup
+
+[Timer]
+OnCalendar=Mon..Sat *-*-* 02:00:00
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

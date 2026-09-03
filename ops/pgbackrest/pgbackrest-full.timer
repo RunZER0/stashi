@@ -1,0 +1,12 @@
+# Runs the weekly full backup every Sunday at 02:00 server time.
+# Install to /etc/systemd/system/, then: systemctl enable --now pgbackrest-full.timer
+[Unit]
+Description=Weekly schedule for Stashi pgBackRest full backup
+
+[Timer]
+OnCalendar=Sun *-*-* 02:00:00
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target
