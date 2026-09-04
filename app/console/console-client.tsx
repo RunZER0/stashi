@@ -671,7 +671,7 @@ function AgentPanel({
       mcpServers: {
         stashi: {
           command: "npx",
-          args: ["-y", "@stashi/mcp-server"],
+          args: ["-y", "@stashidb/mcp-server"],
           env: {
             STASHI_API_KEY: db.apiKey,
             STASHI_DATABASE_ID: db.id,

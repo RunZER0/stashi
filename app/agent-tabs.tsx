@@ -12,7 +12,7 @@ export function AgentTabs() {
   "mcpServers": {
     "stashi": {
       "command": "npx",
-      "args": ["-y", "@stashi/mcp-server"],
+      "args": ["-y", "@stashidb/mcp-server"],
       "env": {
         "STASHI_API_KEY": "st_live_9f8a2bc4e107",
         "STASHI_DATABASE_ID": "DB_xxx"

@@ -1,10 +1,10 @@
 {
-  "name": "@stashi/mcp-server",
+  "name": "@stashidb/mcp-server",
   "version": "0.1.0",
-  "description": "Model Context Protocol server for Stashi PostgreSQL databases — schema inspection, query execution, and agent-triggered checkpoint/rollback.",
+  "description": "Model Context Protocol server for Stashi PostgreSQL databases — schema inspection, scoped query execution, checkpoint/rollback, database branching, per-agent key management, and pgvector-backed agent memory.",
   "type": "module",
   "bin": {
-    "stashi-mcp-server": "./index.js"
+    "stashi-mcp-server": "bin.js"
   },
   "main": "index.js",
   "engines": {

@@ -60,7 +60,7 @@ export default function Home() {
                 boxShadow: "0 2px 8px rgba(0, 0, 0, 0.4)",
               }}
             >
-              npx -y @stashi/mcp-server
+              npx -y @stashidb/mcp-server
             </code>
           </div>
         </div>
