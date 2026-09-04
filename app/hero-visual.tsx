@@ -15,13 +15,9 @@ export function HeroVisual() {
   };
 
   const agentSnippet = `{
-  "tool": "stashi_provision_sandbox",
+  "tool": "create_checkpoint",
   "params": {
-    "agent_id": "claude-code-worker-04",
-    "name": "eval-sandbox-892",
-    "plan": "dev",
-    "hard_cap": "$1/mo",
-    "auto_checkpoint": true
+    "label": "before orders.status migration"
   }
 }`;
 
@@ -89,7 +85,7 @@ export function HeroVisual() {
           <div>
             <div className={styles.dashboardTop}>
               <span>MCP TOOL CALL · AUTONOMOUS AGENT</span>
-              <b>PROVISIONED (420ms)</b>
+              <b>CHECKPOINT SAVED (~2s)</b>
             </div>
 
             <div style={{ padding: "16px 18px", background: "#060706", color: "#e8ece7", borderBottom: "1px solid #1c221c" }}>
@@ -139,14 +135,14 @@ export function HeroVisual() {
                 <small>No loop overages</small>
               </div>
               <div className={styles.metric}>
-                <span>LATENCY</span>
-                <strong>420 ms</strong>
-                <small>Instant ready</small>
+                <span>CHECKPOINT TIME</span>
+                <strong>~2s</strong>
+                <small>Measured, not estimated</small>
               </div>
               <div className={styles.metric}>
-                <span>ROLLBACK</span>
-                <strong>#cp_init</strong>
-                <small>Checkpoint saved</small>
+                <span>TOOL</span>
+                <strong>create_checkpoint</strong>
+                <small>via MCP</small>
               </div>
             </div>
 
@@ -155,7 +151,7 @@ export function HeroVisual() {
                 <span>AGENT DATABASE URL</span>
                 <span style={{ color: "#34d399" }}>TLS + PGBOUNCER</span>
               </div>
-              <code>postgresql://agent_sandbox:••••••••@db.stashi.dev:6432/eval_sandbox_892?sslmode=require</code>
+              <code>postgresql://agent_scoped_role:••••••••@db.stashi.dev:6432/orders_api?sslmode=require</code>
             </div>
           </div>
         ) : (
@@ -183,9 +179,9 @@ export function HeroVisual() {
                 <small>30 limit</small>
               </div>
               <div className={styles.metric}>
-                <span>P95 LATENCY</span>
-                <strong>38 ms</strong>
-                <small>last hour</small>
+                <span>PLAN</span>
+                <strong>Starter</strong>
+                <small>$3/mo flat</small>
               </div>
             </div>
             <div className={styles.connection}>

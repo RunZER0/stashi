@@ -29,7 +29,7 @@ export default function Home() {
             Low-cost, agentic-tuned PostgreSQL from $1 a month.
           </h1>
           <p style={{ color: "#a4aca3" }}>
-            Sub-second provisioning via MCP &amp; REST. Hard-capped fixed pricing from $1/mo protects you from runaway autonomous loop bills. PostgreSQL 17 with TLS and PgBouncer pooling.
+            Automatic provisioning via MCP &amp; REST, no ticket queue. Hard-capped fixed pricing from $1/mo protects you from runaway autonomous loop bills. PostgreSQL 17 with TLS and PgBouncer pooling.
           </p>
           <div className={styles.actions}>
             <Link className="mk-button mk-button-dark" href="/login">
@@ -102,7 +102,7 @@ export default function Home() {
             </h2>
           </div>
           <p style={{ color: "#8f988e", fontSize: "15px", lineHeight: "1.75", margin: 0 }}>
-            When AI agents write schema, execute autonomous migrations, or store multi-agent memory, serverless compute meters can bankrupt you overnight. Stashi combines 400ms provisioning with hard-capped flat pricing and instant schema rollbacks.
+            When AI agents write schema, execute autonomous migrations, or store multi-agent memory, serverless compute meters can bankrupt you overnight. Stashi combines fast, automatic provisioning with hard-capped flat pricing and one-command checkpoint rollbacks.
           </p>
         </div>
 
@@ -123,7 +123,7 @@ export default function Home() {
                 Native MCP Server for Claude, Cursor &amp; Antigravity
               </h3>
               <p style={{ fontSize: "14px", lineHeight: "1.7", color: "#8f988e", margin: 0, maxWidth: "580px" }}>
-                Connect agents directly through standard Model Context Protocol. AI assistants can inspect foreign keys, execute parameterized queries, and create branch instances autonomously.
+                Connect agents directly through standard Model Context Protocol. AI assistants inspect your schema, run scoped queries, and create or roll back checkpoints — through the same audited path a human's queries take, nothing hidden from your activity log.
               </p>
             </div>
             <div style={{ marginTop: "24px", display: "flex", gap: "10px", flexWrap: "wrap", position: "relative", zIndex: 2 }}>
@@ -168,22 +168,22 @@ export default function Home() {
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
                 <span style={{ font: '700 9px/1 "SFMono-Regular", Consolas, monospace', color: "#34d399", letterSpacing: ".1em" }}>
-                  03 / SPEED SLA
+                  03 / NO TICKET QUEUE
                 </span>
                 <span style={{ font: '700 8px/1 "SFMono-Regular", monospace', color: "#8f988e" }}>
-                  LATENCY SLA
+                  AUTOMATIC PROVISIONING
                 </span>
               </div>
               <h3 style={{ fontSize: "21px", letterSpacing: "-.03em", margin: "0 0 10px", color: "#f5f6f4", fontWeight: 700 }}>
-                Sub-400ms Ephemeral Sandboxes
+                Isolated PostgreSQL in seconds
               </h3>
               <p style={{ fontSize: "13px", lineHeight: "1.65", color: "#8f988e", margin: 0 }}>
-                Spin up clean, fully-isolated PostgreSQL instances in under 450ms for agent unit tests, synthetic benchmarks, and ephemeral multi-agent memory scratchpads.
+                Every plan gets its own role and schema, provisioned the moment you ask — no approval queue, no ticket, no human waiting on the other end for agent test runs or new tenant databases.
               </p>
             </div>
             <div style={{ marginTop: "18px", display: "flex", alignItems: "center", gap: "12px", fontSize: "11px", fontFamily: '"SFMono-Regular", monospace', color: "#798378" }}>
-              <span>Provisioning SLA:</span>
-              <strong style={{ color: "#34d399" }}>380ms median</strong>
+              <span>Measured provisioning time:</span>
+              <strong style={{ color: "#34d399" }}>~3s, typically under 5s</strong>
             </div>
           </div>
 
@@ -195,19 +195,19 @@ export default function Home() {
                   04 / RECOVERY GUARDRAIL
                 </span>
                 <span style={{ font: '700 8px/1 "SFMono-Regular", monospace', color: "#8f988e" }}>
-                  INSTANT UNDO
+                  ONE-COMMAND UNDO
                 </span>
               </div>
               <h3 style={{ fontSize: "21px", letterSpacing: "-.03em", margin: "0 0 10px", color: "#f5f6f4", fontWeight: 700 }}>
-                Point-in-Time Checkpoints
+                Checkpoint &amp; Rollback
               </h3>
               <p style={{ fontSize: "13px", lineHeight: "1.65", color: "#8f988e", margin: 0 }}>
-                If an autonomous agent hallucinates a faulty migration or drops a critical relation, roll back to an instant pre-tool snapshot with one single command.
+                If an autonomous agent hallucinates a faulty migration or drops a critical relation, restore the last checkpoint with one command — no manual pg_restore, no DBA on call.
               </p>
             </div>
             <div style={{ marginTop: "18px", display: "flex", alignItems: "center", gap: "12px", fontSize: "11px", fontFamily: '"SFMono-Regular", monospace', color: "#798378" }}>
-              <span>Rollback time:</span>
-              <strong style={{ color: "#34d399" }}>&lt; 50ms</strong>
+              <span>Measured rollback time:</span>
+              <strong style={{ color: "#34d399" }}>seconds, not manual hours</strong>
             </div>
           </div>
         </div>
@@ -342,7 +342,7 @@ export default function Home() {
         <div className={styles.finalInner}>
           <div className={styles.finalCopy}>
             <span className={styles.kicker}>Ready for agents &amp; developers</span>
-            <h2>Create a PostgreSQL database in 400ms.</h2>
+            <h2>Create a PostgreSQL database in seconds.</h2>
           </div>
           <Link className="mk-button mk-button-light" href="/login">Create database <ArrowRight size={16} /></Link>
         </div>

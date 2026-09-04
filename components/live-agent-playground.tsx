@@ -9,7 +9,6 @@ interface PromptDemo {
   agentPrompt: string;
   toolCall: string;
   sqlExecuted: string;
-  latency: string;
   rowsAffected: number;
 }
 
@@ -17,34 +16,32 @@ const demos: PromptDemo[] = [
   {
     id: "schema",
     label: "Inspect Schema via MCP",
-    agentPrompt: "Agent: 'Inspect existing tables, column types, and foreign key relations before writing the migration.'",
-    toolCall: "stashi_inspect_schema({ include_indexes: true })",
-    sqlExecuted: `SELECT table_name, column_name, data_type, is_nullable
-FROM information_schema.columns
-WHERE table_schema = 'public'
-ORDER BY table_name, ordinal_position;`,
-    latency: "14ms",
+    agentPrompt: "Agent: 'Inspect existing tables and row counts before writing the migration.'",
+    toolCall: "list_tables()",
+    sqlExecuted: `SELECT c.relname AS table_name, c.reltuples::bigint AS estimated_rows,
+       pg_size_pretty(pg_total_relation_size(c.oid)) AS total_size
+FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE c.relkind = 'r' AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+ORDER BY c.relname;`,
     rowsAffected: 18,
   },
   {
-    id: "sandbox",
-    label: "Spawn Ephemeral Sandbox",
-    agentPrompt: "Agent: 'Provision an isolated scratch database for running integration tests against eval suite #94.'",
-    toolCall: "stashi_provision_sandbox({ name: 'eval-94', plan: 'dev', auto_ttl: '2h' })",
-    sqlExecuted: `CREATE DATABASE eval_sandbox_94_test WITH TEMPLATE template_clean;
-GRANT ALL PRIVILEGES ON DATABASE eval_sandbox_94_test TO eval_worker;`,
-    latency: "385ms",
+    id: "query",
+    label: "Run a Scoped Query",
+    agentPrompt: "Agent: 'Check for orders stuck in pending status before running the cleanup job.'",
+    toolCall: "run_query({ sql: \"select id from orders where status='pending' and created_at < now() - interval '1 day'\" })",
+    sqlExecuted: `-- Executed with the tenant's own scoped role, 15s timeout, 500 row cap
+-- Same access as psql. Shows up in the audit log as this agent's API key.`,
     rowsAffected: 1,
   },
   {
     id: "checkpoint",
-    label: "Undo Hallucinated Migration",
-    agentPrompt: "Agent: 'Migration failed due to type mismatch in payments table. Triggering instant rollback.'",
-    toolCall: "stashi_rollback_checkpoint({ checkpoint_id: 'cp_pre_migration_882' })",
-    sqlExecuted: `-- RESTORING SNAPSHOT #cp_pre_migration_882
-ALTER TABLE accounts DROP COLUMN IF EXISTS temp_balance_calc;
--- State verified healthy. Zero data loss.`,
-    latency: "42ms",
+    label: "Undo a Bad Migration",
+    agentPrompt: "Agent: 'Migration failed due to a type mismatch in the payments table. Rolling back.'",
+    toolCall: "rollback_last_checkpoint()",
+    sqlExecuted: `-- Restores the most recent "ready" checkpoint via pg_restore.
+-- Database is briefly unavailable while the restore runs.
+-- Measured on a live test run: ~5s for a small schema.`,
     rowsAffected: 0,
   },
 ];
@@ -89,13 +86,13 @@ export function LiveAgentPlayground() {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#34d399", display: "inline-block", boxShadow: "0 0 8px rgba(52, 211, 153, 0.6)" }} />
+          <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#34d399", display: "inline-block", boxShadow: "0 0 0 3px rgba(52, 211, 153, 0.18)" }} />
           <span style={{ font: '700 10px/1 "SFMono-Regular", Consolas, monospace', color: "#f0f2ef", letterSpacing: ".08em" }}>
-            LIVE AGENTIC INTERACTIVE SIMULATOR
+            MCP TOOL CALL WALKTHROUGH
           </span>
         </div>
         <span style={{ font: '700 9px/1 "SFMono-Regular", monospace', color: "#798378" }}>
-          CLICK AN ACTION TO TEST MCP EXECUTION
+          CLICK AN ACTION — REAL TOOL NAMES, ILLUSTRATIVE DATA
         </span>
       </div>
 
@@ -174,7 +171,7 @@ export function LiveAgentPlayground() {
                 POSTGRESQL 17 ENGINE EXECUTION
               </span>
               <span style={{ font: '700 8px/1 "SFMono-Regular", monospace', color: "#34d399" }}>
-                {running ? "RUNNING..." : `${activeDemo.latency} latency`}
+                {running ? "RUNNING..." : "COMPLETE"}
               </span>
             </div>
             <pre style={{ margin: 0, fontSize: "11px", color: "#d8e2d9", fontFamily: '"SFMono-Regular", Consolas, monospace', lineHeight: 1.5, whiteSpace: "pre-wrap" }}>

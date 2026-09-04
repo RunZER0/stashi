@@ -14,42 +14,37 @@ export function AgentTabs() {
       "command": "npx",
       "args": ["-y", "@stashi/mcp-server"],
       "env": {
-        "STASHI_API_KEY": "st_live_9f8a2bc4e107"
+        "STASHI_API_KEY": "st_live_9f8a2bc4e107",
+        "STASHI_DATABASE_ID": "DB_xxx"
       }
     }
   }
 }`,
-    python: `from stashi import StashiAgent
+    python: `import requests
 
-# Sub-second ephemeral database for agentic scratchpad
-db = StashiAgent.create_sandbox(
-    name="swarm-research-memory",
-    plan="dev",            # Fixed $1/mo flat — no loop overages
-    ttl="24h",             # Ephemeral teardown or keep persistent
-    auto_checkpoint=True   # Instant rollback if agent hallucinates
+# No SDK to install — the API key that powers MCP tool calls works
+# directly over plain HTTP, on the same audited path a human's queries take.
+BASE = "https://stashi.onrender.com/api/databases"
+resp = requests.post(
+    f"{BASE}/{DATABASE_ID}/query",
+    headers={"Authorization": f"Bearer {STASHI_API_KEY}"},
+    json={"sql": "select id from orders where status='pending' limit 50"},
 )
-
-# Pass connection string directly to LangChain / LlamaIndex / CrewAI
-agent.bind_database(db.connection_url)`,
-    ts: `import { stashi } from "@stashi/sdk";
-import { generateText } from "ai";
-
-// Autonomous agent tool for database provisioning
-const sandbox = await stashi.createSandbox({
-  name: "eval-task-runner",
-  plan: "dev", // $1/mo hard cap
-  region: "us-east-nj"
-});
-
-console.log("Ready for tool calls:", sandbox.connectionUrl);`,
-    rest: `curl -X POST https://api.stashi.dev/v1/databases \\
+print(resp.json()["rows"])`,
+    ts: `// No SDK — plain fetch against the same endpoint the MCP server calls.
+const res = await fetch(
+  \`https://stashi.onrender.com/api/databases/\${databaseId}/query\`,
+  {
+    method: "POST",
+    headers: { Authorization: \`Bearer \${process.env.STASHI_API_KEY}\` },
+    body: JSON.stringify({ sql: "select 1" }),
+  }
+);
+const { rows } = await res.json();`,
+    rest: `curl -X POST https://stashi.onrender.com/api/databases/DB_xxx/query \\
   -H "Authorization: Bearer st_live_••••••••" \\
   -H "Content-Type: application/json" \\
-  -d '{
-    "name": "agent-db-01",
-    "plan": "dev",
-    "guardrails": { "hard_cap": 1.00, "allow_overages": false }
-  }'`,
+  -d '{"sql": "select id from orders where status = '"'"'pending'"'"' limit 50"}'`,
   };
 
   const copyCode = () => {

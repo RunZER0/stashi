@@ -6,7 +6,6 @@
   min-height: 100vh;
   background: #080908;
   color: #f0f2ef;
-  background-image: radial-gradient(circle at 50% 0%, rgba(52, 211, 153, 0.08) 0%, transparent 60%);
   background-attachment: fixed;
 }
 
@@ -38,9 +37,8 @@
 .ambient-video-vignette {
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse 90% 60% at 50% 0%, rgba(52, 211, 153, 0.14) 0%, transparent 55%),
-    radial-gradient(ellipse 80% 50% at 50% 100%, rgba(8, 10, 8, 0.4) 0%, transparent 60%),
-    linear-gradient(180deg, rgba(8, 9, 8, 0.32) 0%, rgba(8, 9, 8, 0.42) 45%, rgba(8, 9, 8, 0.75) 100%);
+  background: radial-gradient(ellipse 80% 50% at 50% 100%, rgba(8, 10, 8, 0.4) 0%, transparent 60%),
+    linear-gradient(180deg, rgba(8, 9, 8, 0.38) 0%, rgba(8, 9, 8, 0.42) 45%, rgba(8, 9, 8, 0.78) 100%);
 }
 @media (prefers-reduced-motion: reduce) {
   .ambient-video-bg-el { display: none; }
@@ -88,7 +86,6 @@
 .mk-brand span {
   color: #34d399;
   margin-left: 1px;
-  text-shadow: 0 0 14px rgba(52, 211, 153, 0.45);
 }
 .mk-nav {
   display: flex;
@@ -141,7 +138,6 @@
 .mk-button-dark:hover {
   background: #1d231d;
   border-color: #34d399;
-  box-shadow: 0 6px 22px rgba(52, 211, 153, 0.18);
 }
 .mk-button-light {
   background: #f0f2ef;
@@ -469,16 +465,6 @@
   position: relative;
   overflow: hidden;
 }
-.mk-final-panel:before {
-  content: "";
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 300px;
-  height: 100%;
-  background: radial-gradient(circle at 100% 50%, rgba(52, 211, 153, 0.08) 0%, transparent 70%);
-  pointer-events: none;
-}
 .mk-final h2 {
   font-size: 42px;
   line-height: 1.02;
@@ -545,7 +531,6 @@
   right: -1px;
   height: 3px;
   background: #34d399;
-  box-shadow: 0 0 10px rgba(52, 211, 153, 0.5);
 }
 .mk-plan-name {
   display: flex;
