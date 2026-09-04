@@ -11,6 +11,7 @@ import {
   Clipboard,
   Database,
   Gauge,
+  GitBranch,
   HardDrive,
   KeyRound,
   MoreHorizontal,
@@ -31,6 +32,7 @@ import {
   type Checkpoint,
   type ManagedDatabase,
   type Node,
+  type ScopedKey,
 } from "@/lib/control-plane";
 import { getPlan, plans, type PlanId } from "@/lib/plans";
 import { SqlEditor } from "./sql-editor";
@@ -67,6 +69,7 @@ export default function ConsoleClient({
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("new-app");
   const [newPlan, setNewPlan] = useState<PlanId>("starter");
+  const [newTtlHours, setNewTtlHours] = useState<string>("");
   const [planChangeOpen, setPlanChangeOpen] = useState(false);
   const [changingPlan, setChangingPlan] = useState(false);
   const [busyAction, setBusyAction] = useState<"rotate" | "suspend" | "delete" | null>(null);
@@ -112,10 +115,11 @@ export default function ConsoleClient({
   const createDatabase = async () => {
     if (!newName.trim()) return;
     setCreating(true);
+    const ttlHours = newTtlHours.trim() ? Number(newTtlHours) : undefined;
     const response = await fetch("/api/databases", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: newName, plan: newPlan, region: "us-east" }),
+      body: JSON.stringify({ name: newName, plan: newPlan, region: "us-east", ttlHours }),
     });
     const payload = await response.json();
     setDatabases((current) => [payload.database, ...current]);
@@ -123,8 +127,9 @@ export default function ConsoleClient({
     setTab("overview");
     setCreating(false);
     setCreateOpen(false);
+    setNewTtlHours("");
     await refreshActivity();
-    notify("Provisioning queued — waiting on the node agent");
+    notify(ttlHours ? `Provisioning queued — auto-deletes in ${ttlHours}h` : "Provisioning queued — waiting on the node agent");
     pollUntilSettled(payload.database.id);
   };
 
@@ -407,6 +412,8 @@ export default function ConsoleClient({
           setName={setNewName}
           plan={newPlan}
           setPlan={setNewPlan}
+          ttlHours={newTtlHours}
+          setTtlHours={setNewTtlHours}
           creating={creating}
           onClose={() => setCreateOpen(false)}
           onCreate={createDatabase}
@@ -731,7 +738,173 @@ function AgentPanel({
           </div>
         </section>
       </div>
+
+      <ScopedKeysPanel db={db} notify={notify} />
+      <BranchPanel db={db} notify={notify} />
     </div>
+  );
+}
+
+function ScopedKeysPanel({ db, notify }: { db: ManagedDatabase; notify: (m: string) => void }) {
+  const [keys, setKeys] = useState<ScopedKey[] | null>(null);
+  const [label, setLabel] = useState("");
+  const [scope, setScope] = useState<"full" | "readonly">("readonly");
+  const [creating, setCreating] = useState(false);
+
+  const load = async () => {
+    const res = await fetch(`/api/databases/${db.id}/keys`);
+    if (!res.ok) return;
+    const payload = await res.json();
+    setKeys(payload.keys ?? []);
+  };
+
+  useEffect(() => {
+    load();
+  }, [db.id]);
+
+  const create = async () => {
+    if (!label.trim()) return;
+    setCreating(true);
+    try {
+      const res = await fetch(`/api/databases/${db.id}/keys`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ label, scope }),
+      });
+      const payload = await res.json();
+      if (!res.ok) {
+        notify(payload.error || "Could not create key");
+      } else {
+        notify(`Key created for "${label}" — copy it now, it won't be shown in full again`);
+        navigator.clipboard?.writeText(payload.key.apiKey).catch(() => {});
+        setLabel("");
+        await load();
+      }
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const revoke = async (id: string, keyLabel: string) => {
+    if (!window.confirm(`Revoke the key for "${keyLabel}"? Any agent using it loses access immediately.`)) return;
+    const res = await fetch(`/api/databases/${db.id}/keys/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      notify(`Revoked "${keyLabel}"`);
+      await load();
+    }
+  };
+
+  return (
+    <section className="data-panel">
+      <div className="panel-header">
+        <div>
+          <span className="label">PER-AGENT ACCESS</span>
+          <h3>Scoped agent keys</h3>
+        </div>
+      </div>
+      <p className="panel-footnote" style={{ marginTop: 0, paddingTop: 0, borderTop: "none" }}>
+        Issue a separate key per agent in a swarm — each one shows up by name in the audit log, and read-only keys
+        can never run a write, DDL, or checkpoint restore.
+      </p>
+      <div style={{ display: "flex", gap: "8px", margin: "14px 0", flexWrap: "wrap" }}>
+        <input
+          placeholder="Label, e.g. 'research-subagent'"
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          style={{ flex: 1, minWidth: "180px", minHeight: "36px", border: "1px solid var(--line-dark)", background: "#131613", padding: "0 10px", color: "var(--ink)" }}
+        />
+        <select
+          value={scope}
+          onChange={(e) => setScope(e.target.value as "full" | "readonly")}
+          style={{ minHeight: "36px", border: "1px solid var(--line-dark)", background: "#131613", color: "var(--ink)", padding: "0 8px" }}
+        >
+          <option value="readonly">Read-only</option>
+          <option value="full">Full access</option>
+        </select>
+        <button className="button button-dark button-compact" onClick={create} disabled={creating || !label.trim()}>
+          {creating ? <span className="spinner spinner-dark" /> : <Plus size={13} />}
+          Create key
+        </button>
+      </div>
+
+      {keys === null ? (
+        <div className="skeleton skeleton-row" style={{ width: "100%" }} />
+      ) : keys.length === 0 ? (
+        <p className="panel-footnote">No scoped keys yet — every agent currently shares the one MCP key above.</p>
+      ) : (
+        <div className="credential-table">
+          {keys.map((k) => (
+            <div key={k.id}>
+              <span>{k.label}</span>
+              <code>
+                {k.apiKey.slice(0, 12)}…{k.scope === "readonly" ? " · read-only" : " · full access"}
+                {k.lastUsedAt ? ` · last used ${new Date(k.lastUsedAt).toLocaleDateString()}` : " · never used"}
+              </code>
+              <button onClick={() => revoke(k.id, k.label)}>Revoke</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function BranchPanel({ db, notify }: { db: ManagedDatabase; notify: (m: string) => void }) {
+  const [name, setName] = useState(`${db.name}-branch`);
+  const [ttl, setTtl] = useState("");
+  const [creating, setCreating] = useState(false);
+
+  const create = async () => {
+    setCreating(true);
+    try {
+      const res = await fetch(`/api/databases/${db.id}/branch`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name, ttlHours: ttl.trim() ? Number(ttl) : undefined }),
+      });
+      const payload = await res.json();
+      if (!res.ok) {
+        notify(payload.error || "Could not create branch");
+      } else {
+        notify(`Branch "${payload.database.name}" is provisioning from a live copy of this database`);
+      }
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <section className="data-panel">
+      <div className="panel-header">
+        <div>
+          <span className="label">TESTING &amp; EVALS</span>
+          <h3>Branch this database</h3>
+        </div>
+      </div>
+      <p className="panel-footnote" style={{ marginTop: 0, paddingTop: 0, borderTop: "none" }}>
+        Creates a new, fully separate database seeded with a real copy of this one's current data — for testing a
+        migration or an eval run without touching this data. It bills as its own database on the same plan.
+      </p>
+      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          style={{ flex: 1, minWidth: "180px", minHeight: "36px", border: "1px solid var(--line-dark)", background: "#131613", padding: "0 10px", color: "var(--ink)" }}
+        />
+        <input
+          type="number"
+          min={1}
+          placeholder="Auto-delete after N hours (optional)"
+          value={ttl}
+          onChange={(e) => setTtl(e.target.value)}
+          style={{ width: "220px", minHeight: "36px", border: "1px solid var(--line-dark)", background: "#131613", padding: "0 10px", color: "var(--ink)" }}
+        />
+        <button className="button button-dark button-compact" onClick={create} disabled={creating || !name.trim()}>
+          {creating ? <span className="spinner spinner-dark" /> : <GitBranch size={13} />}
+          Create branch
+        </button>
+      </div>
+    </section>
   );
 }
 
@@ -963,6 +1136,8 @@ function CreateModal({
   setName,
   plan,
   setPlan,
+  ttlHours,
+  setTtlHours,
   creating,
   onClose,
   onCreate,
@@ -971,6 +1146,8 @@ function CreateModal({
   setName: (v: string) => void;
   plan: PlanId;
   setPlan: (v: PlanId) => void;
+  ttlHours: string;
+  setTtlHours: (v: string) => void;
   creating: boolean;
   onClose: () => void;
   onCreate: () => void;
@@ -1017,6 +1194,16 @@ function CreateModal({
           <select defaultValue="us-east">
             <option value="us-east">US East · New Jersey</option>
           </select>
+        </label>
+        <label className="field-label">
+          Auto-delete after (hours) — optional
+          <input
+            type="number"
+            min={1}
+            placeholder="Leave blank to keep indefinitely"
+            value={ttlHours}
+            onChange={(e) => setTtlHours(e.target.value)}
+          />
         </label>
         <div className="provision-preview">
           <span>

@@ -129,7 +129,7 @@ export function CheckpointsPanel({
               <div className="checkpoint-row" key={c.id}>
                 <div>
                   <span className={`checkpoint-kind ${c.kind === "backup" ? "kind-backup" : ""}`}>
-                    {c.kind === "backup" ? "BACKUP" : "CHECKPOINT"}
+                    {c.kind === "backup" ? "BACKUP" : c.kind === "auto" ? "AUTO-CHECKPOINT" : "CHECKPOINT"}
                   </span>
                   {c.kind === "backup" && c.status === "ready" && (
                     <span

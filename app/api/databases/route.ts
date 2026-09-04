@@ -13,11 +13,12 @@ export async function POST(request: Request) {
   const email = (await cookies()).get("stashi_session")?.value;
   if (!email) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
 
-  const body = (await request.json()) as { name?: string; plan?: PlanId; region?: string };
+  const body = (await request.json()) as { name?: string; plan?: PlanId; region?: string; ttlHours?: number };
   const { database, job } = await createDatabase(email, {
     name: body.name || "database",
     plan: body.plan || "starter",
     region: body.region || "us-east",
+    ttlHours: body.ttlHours,
   });
 
   return NextResponse.json({ database, job }, { status: 201 });

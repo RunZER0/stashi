@@ -8,6 +8,8 @@ import type {
   CheckpointKind,
   ManagedDatabase,
   Node,
+  ScopedKey,
+  ScopedKeyScope,
 } from "./control-plane";
 import { getPlan, type PlanId } from "./plans";
 
@@ -52,6 +54,21 @@ function rowToDatabase(row: any): ManagedDatabase {
     p95LatencyMs: row.p95_latency_ms,
     tenancyMode: row.tenancy_mode,
     poolSchema: row.pool_schema,
+    expiresAt: row.expires_at ? row.expires_at.toISOString() : null,
+    parentDatabaseId: row.parent_database_id,
+  };
+}
+
+function rowToScopedKey(row: any): ScopedKey {
+  return {
+    id: row.id,
+    databaseId: row.database_id,
+    label: row.label,
+    apiKey: row.api_key,
+    scope: row.scope,
+    createdAt: row.created_at.toISOString(),
+    lastUsedAt: row.last_used_at ? row.last_used_at.toISOString() : null,
+    revokedAt: row.revoked_at ? row.revoked_at.toISOString() : null,
   };
 }
 
@@ -143,7 +160,7 @@ export async function getDatabase(email: string, id: string): Promise<ManagedDat
 // shared pool (schema isolation); everything else gets its own database.
 export async function createDatabase(
   email: string,
-  input: { name: string; plan: PlanId; region: string }
+  input: { name: string; plan: PlanId; region: string; ttlHours?: number; parentDatabaseId?: string }
 ): Promise<{ database: ManagedDatabase; job: AgentJob }> {
   await ensureSchema();
   const pool = getPool();
@@ -159,13 +176,15 @@ export async function createDatabase(
   const name = input.name.trim() || "database";
   const plan = getPlan(input.plan);
   const pooled = input.plan === "dev";
+  const expiresAt =
+    input.ttlHours && input.ttlHours > 0 ? new Date(Date.now() + input.ttlHours * 3600_000) : null;
 
   const roleName = pooled ? `st_pool_${safeName}_${suffix}` : `st_${safeName}_${suffix}`;
   const dbNameOrSchema = pooled ? `t_${safeName}_${suffix}` : `st_${safeName}_${suffix}`;
 
   await pool.query(
-    `INSERT INTO databases (id, owner_email, name, plan, region, status, version, host, port, database_name, username, password, api_key, tenancy_mode, pool_schema)
-     VALUES ($1,$2,$3,$4,$5,'provisioning','17',$6,$7,$8,$9,$10,$11,$12,$13)`,
+    `INSERT INTO databases (id, owner_email, name, plan, region, status, version, host, port, database_name, username, password, api_key, tenancy_mode, pool_schema, expires_at, parent_database_id)
+     VALUES ($1,$2,$3,$4,$5,'provisioning','17',$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
     [
       id,
       email,
@@ -180,6 +199,8 @@ export async function createDatabase(
       apiKey,
       pooled ? "pooled" : "isolated",
       pooled ? dbNameOrSchema : null,
+      expiresAt,
+      input.parentDatabaseId ?? null,
     ]
   );
 
@@ -204,6 +225,110 @@ export async function createDatabase(
   const database = (await getDatabase(email, id))!;
   const { rows } = await pool.query(`SELECT * FROM jobs WHERE id = $1`, [jobId]);
   return { database, job: rowToJob(rows[0]) };
+}
+
+// Real branching: a new database (own role, same tenancy mode as the
+// source) seeded with a pg_dump of the source's current data via the same
+// dump/restore machinery checkpoints already use, restored into the new
+// target instead of back onto the source. Not storage-layer copy-on-write
+// -- a full logical copy -- but real, and it doesn't require locking out
+// the source database the way `CREATE DATABASE ... TEMPLATE` would.
+export async function createBranch(
+  email: string,
+  sourceId: string,
+  name: string,
+  ttlHours?: number
+): Promise<{ database: ManagedDatabase; job: AgentJob }> {
+  await ensureSchema();
+  const pool = getPool();
+  const source = await getDatabase(email, sourceId);
+  if (!source) throw new Error("not_found");
+  if (source.status !== "healthy") throw new Error("database_not_ready");
+
+  const safeName = slugify(name);
+  const suffix = randomBytes(3).toString("hex");
+  const password = `st_${randomBytes(12).toString("base64url")}`;
+  const id = newId("db").toUpperCase();
+  const apiKey = `st_live_${randomBytes(9).toString("hex")}`;
+  const pooled = source.tenancyMode === "pooled";
+  const plan = getPlan(source.plan);
+  const expiresAt = ttlHours && ttlHours > 0 ? new Date(Date.now() + ttlHours * 3600_000) : null;
+
+  const roleName = pooled ? `st_pool_${safeName}_${suffix}` : `st_${safeName}_${suffix}`;
+  const dbNameOrSchema = pooled ? `t_${safeName}_${suffix}` : `st_${safeName}_${suffix}`;
+
+  await pool.query(
+    `INSERT INTO databases (id, owner_email, name, plan, region, status, version, host, port, database_name, username, password, api_key, tenancy_mode, pool_schema, expires_at, parent_database_id)
+     VALUES ($1,$2,$3,$4,$5,'provisioning','17',$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+    [
+      id,
+      email,
+      name.trim() || `${source.name}-branch`,
+      source.plan,
+      source.region,
+      source.host,
+      source.port,
+      pooled ? POOL_DATABASE : dbNameOrSchema,
+      roleName,
+      password,
+      apiKey,
+      pooled ? "pooled" : "isolated",
+      pooled ? dbNameOrSchema : null,
+      expiresAt,
+      sourceId,
+    ]
+  );
+
+  const jobId = newId("job");
+  const payload = pooled
+    ? {
+        source_pool_database: POOL_DATABASE,
+        source_schema_name: source.poolSchema,
+        target_pool_database: POOL_DATABASE,
+        target_schema_name: dbNameOrSchema,
+        role_name: roleName,
+        password,
+        connection_limit: plan.connections,
+      }
+    : {
+        source_database_name: source.database,
+        target_database_name: dbNameOrSchema,
+        role_name: roleName,
+        password,
+        connection_limit: plan.connections,
+      };
+  await pool.query(
+    `INSERT INTO jobs (id, node_id, type, payload, status, owner_email, database_id)
+     VALUES ($1,$2,'create_branch',$3,'pending',$4,$5)`,
+    [jobId, DEFAULT_NODE_ID, JSON.stringify(payload), email, id]
+  );
+  await pushActivity(email, "you", "database.branch.queued", `${name} (from ${source.name})`);
+
+  const database = (await getDatabase(email, id))!;
+  const { rows } = await pool.query(`SELECT * FROM jobs WHERE id = $1`, [jobId]);
+  return { database, job: rowToJob(rows[0]) };
+}
+
+// Finds databases past their TTL and enqueues real delete jobs for them --
+// called by the control plane's TTL sweep endpoint, which the node agent
+// pings periodically (see app/api/agent/ttl-sweep). Reuses deleteDatabase
+// so an expired branch or scratch database is torn down exactly the way a
+// manual delete would be.
+export async function reapExpiredDatabases(): Promise<{ id: string; name: string; ownerEmail: string }[]> {
+  await ensureSchema();
+  const pool = getPool();
+  const { rows } = await pool.query(
+    `SELECT id, name, owner_email FROM databases WHERE expires_at IS NOT NULL AND expires_at < now() AND status NOT IN ('provisioning')`
+  );
+  const reaped: { id: string; name: string; ownerEmail: string }[] = [];
+  for (const row of rows) {
+    const target = await deleteDatabase(row.owner_email, row.id);
+    if (target) {
+      await pushActivity(row.owner_email, "system", "database.ttl_expired.deleted", row.name);
+      reaped.push({ id: row.id, name: row.name, ownerEmail: row.owner_email });
+    }
+  }
+  return reaped;
 }
 
 export async function updateDatabase(
@@ -356,6 +481,12 @@ export async function listCheckpoints(databaseId: string): Promise<Checkpoint[]>
   return rows.map(rowToCheckpoint);
 }
 
+export async function getCheckpoint(checkpointId: string): Promise<Checkpoint | null> {
+  await ensureSchema();
+  const { rows } = await getPool().query(`SELECT * FROM checkpoints WHERE id = $1`, [checkpointId]);
+  return rows[0] ? rowToCheckpoint(rows[0]) : null;
+}
+
 export async function createCheckpoint(
   email: string,
   databaseId: string,
@@ -468,7 +599,13 @@ export async function claimNextJob(nodeId: string): Promise<AgentJob | null> {
   return rows[0] ? rowToJob(rows[0]) : null;
 }
 
-const DATABASE_STATUS_JOB_TYPES = new Set(["create_database", "create_pool_tenant", "resize_plan", "restore_checkpoint"]);
+const DATABASE_STATUS_JOB_TYPES = new Set([
+  "create_database",
+  "create_pool_tenant",
+  "create_branch",
+  "resize_plan",
+  "restore_checkpoint",
+]);
 
 export async function completeJob(
   jobId: string,
@@ -488,7 +625,7 @@ export async function completeJob(
 
   const ok = status === "completed";
 
-  if (job.type === "create_database" || job.type === "create_pool_tenant") {
+  if (job.type === "create_database" || job.type === "create_pool_tenant" || job.type === "create_branch") {
     await pool.query(`UPDATE databases SET status = $3 WHERE owner_email = $1 AND id = $2`, [
       job.ownerEmail,
       job.databaseId,
@@ -546,6 +683,70 @@ export async function completeJob(
   }
 
   return job;
+}
+
+// --- Scoped API keys --------------------------------------------------
+// A database's primary api_key (on the databases row itself) is the
+// full-access owner key shown in the console's MCP config. These are
+// additional keys for individual agents in a swarm sharing one database --
+// each one revocable on its own, optionally read-only, and distinguishable
+// in the audit log by label instead of every agent looking identical.
+
+export async function listScopedKeys(email: string, databaseId: string): Promise<ScopedKey[]> {
+  await ensureSchema();
+  const db = await getDatabase(email, databaseId);
+  if (!db) throw new Error("not_found");
+  const { rows } = await getPool().query(
+    `SELECT * FROM scoped_keys WHERE database_id = $1 AND revoked_at IS NULL ORDER BY created_at DESC`,
+    [databaseId]
+  );
+  return rows.map(rowToScopedKey);
+}
+
+export async function createScopedKey(
+  email: string,
+  databaseId: string,
+  label: string,
+  scope: ScopedKeyScope
+): Promise<ScopedKey> {
+  await ensureSchema();
+  const db = await getDatabase(email, databaseId);
+  if (!db) throw new Error("not_found");
+
+  const id = newId("key");
+  const apiKey = `st_${scope === "readonly" ? "ro" : "live"}_${randomBytes(9).toString("hex")}`;
+  const { rows } = await getPool().query(
+    `INSERT INTO scoped_keys (id, database_id, owner_email, label, api_key, scope) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+    [id, databaseId, email, label.trim() || "Unlabeled agent", apiKey, scope]
+  );
+  await pushActivity(email, "you", "scoped_key.created", `${label} (${scope}) on ${db.name}`);
+  return rowToScopedKey(rows[0]);
+}
+
+export async function revokeScopedKey(email: string, databaseId: string, keyId: string): Promise<void> {
+  await ensureSchema();
+  const db = await getDatabase(email, databaseId);
+  if (!db) throw new Error("not_found");
+  const { rows } = await getPool().query(
+    `UPDATE scoped_keys SET revoked_at = now() WHERE id = $1 AND database_id = $2 AND revoked_at IS NULL RETURNING label`,
+    [keyId, databaseId]
+  );
+  if (rows[0]) await pushActivity(email, "you", "scoped_key.revoked", `${rows[0].label} on ${db.name}`);
+}
+
+// Resolves a Bearer token against the scoped_keys table (checked when it
+// doesn't match a database's primary api_key -- see lib/auth.ts). Updates
+// last_used_at best-effort so "unused since" is real, not decorative.
+export async function resolveScopedKey(
+  apiKey: string
+): Promise<{ email: string; databaseId: string; scope: ScopedKeyScope; label: string } | null> {
+  await ensureSchema();
+  const { rows } = await getPool().query(
+    `UPDATE scoped_keys SET last_used_at = now() WHERE api_key = $1 AND revoked_at IS NULL RETURNING owner_email, database_id, scope, label`,
+    [apiKey]
+  );
+  if (!rows[0]) return null;
+  return { email: rows[0].owner_email, databaseId: rows[0].database_id, scope: rows[0].scope, label: rows[0].label };
 }
 
 export async function adminSummary() {

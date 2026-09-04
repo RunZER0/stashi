@@ -27,9 +27,24 @@ export type ManagedDatabase = {
   p95LatencyMs: number | null;
   tenancyMode: TenancyMode;
   poolSchema: string | null;
+  expiresAt: string | null;
+  parentDatabaseId: string | null;
 };
 
-export type CheckpointKind = "checkpoint" | "backup";
+export type ScopedKeyScope = "full" | "readonly";
+
+export type ScopedKey = {
+  id: string;
+  databaseId: string;
+  label: string;
+  apiKey: string;
+  scope: ScopedKeyScope;
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+};
+
+export type CheckpointKind = "checkpoint" | "backup" | "auto";
 export type CheckpointStatus = "pending" | "ready" | "failed" | "restoring";
 
 export type Checkpoint = {

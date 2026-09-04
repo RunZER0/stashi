@@ -24,13 +24,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const label = body.label?.trim() || (kind === "backup" ? "Manual backup" : "Checkpoint");
 
   try {
-    const { checkpoint, job } = await createCheckpoint(
-      access.email,
-      id,
-      kind,
-      label,
-      access.via === "apiKey" ? "agent" : "you"
-    );
+    const actor = access.via === "apiKey" ? (access.keyLabel ? `agent:${access.keyLabel}` : "agent") : "you";
+    const { checkpoint, job } = await createCheckpoint(access.email, id, kind, label, actor);
     return NextResponse.json({ checkpoint, job }, { status: 201 });
   } catch (err: any) {
     const status = err.message === "not_found" ? 404 : 400;

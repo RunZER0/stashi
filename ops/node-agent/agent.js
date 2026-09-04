@@ -19,6 +19,7 @@ const SHARED_SECRET = process.env.STASHI_AGENT_SHARED_SECRET || "dev_stashi_secr
 const POLL_INTERVAL = parseInt(process.env.STASHI_JOB_POLL_INTERVAL_SEC || "5", 10) * 1000;
 const METRICS_INTERVAL = parseInt(process.env.STASHI_METRICS_INTERVAL_SEC || "60", 10) * 1000;
 const CHECKPOINT_DIR = "/var/backups/stashi/checkpoints";
+const BRANCH_DIR = "/var/backups/stashi/branches";
 
 const cleanIdent = (value) => String(value || "").replace(/[^a-zA-Z0-9_]/g, "");
 
@@ -140,6 +141,11 @@ const JobHandlers = {
     await runPsql(`CREATE DATABASE "${cleanDb}" WITH OWNER = "${cleanRole}";`);
     await runPsql(`REVOKE ALL ON DATABASE "${cleanDb}" FROM PUBLIC;`);
     await runPsql(`GRANT ALL ON DATABASE "${cleanDb}" TO "${cleanRole}";`);
+    // Pre-installed as superuser so agent-memory tables (vector columns) work
+    // out of the box — a plain tenant role can't CREATE EXTENSION itself
+    // (pgvector isn't marked "trusted"), but it can freely create tables
+    // using a type the extension already provides in this database.
+    await runPsql(`CREATE EXTENSION IF NOT EXISTS vector;`, ["-d", cleanDb]);
 
     if (fs.existsSync("/etc/pgbouncer/userlist.txt")) {
       const scramHash = await runPsql(`SELECT rolpassword FROM pg_authid WHERE rolname = '${cleanRole}';`);
@@ -162,6 +168,10 @@ const JobHandlers = {
       `CREATE ROLE "${cleanRole}" WITH LOGIN PASSWORD '${password.replace(/'/g, "''")}' NOSUPERUSER NOCREATEDB NOCREATEROLE CONNECTION LIMIT ${parseInt(connection_limit, 10)};`
     );
     await runPsql(`GRANT CONNECT, TEMP ON DATABASE "${cleanDb}" TO "${cleanRole}";`);
+    // Idempotent and shared across every pool tenant — pgvector only needs
+    // installing once per database, not once per schema, so this is a cheap
+    // no-op after the first tenant.
+    await runPsql(`CREATE EXTENSION IF NOT EXISTS vector;`, ["-d", cleanDb]);
     await runPsql(`CREATE SCHEMA "${cleanSchema}" AUTHORIZATION "${cleanRole}";`, ["-d", cleanDb]);
     // Role-level default: applied automatically on every future connection to
     // this database, including through PgBouncer's transaction pooling
@@ -174,6 +184,85 @@ const JobHandlers = {
     }
 
     return { status: "ready", database: cleanDb, schema: cleanSchema, role: cleanRole };
+  },
+
+  // 1c. Branch: a real logical copy of the source's current data into a
+  // brand-new role + schema/database, via the same pg_dump/pg_restore
+  // machinery checkpoints use — just restored into a new target instead of
+  // back onto the source. Deliberately not `CREATE DATABASE ... TEMPLATE`,
+  // which requires exclusive access to the template database (no other
+  // connections allowed); dump/restore works even while the source is live.
+  async create_branch({
+    source_pool_database,
+    source_schema_name,
+    source_database_name,
+    target_pool_database,
+    target_schema_name,
+    target_database_name,
+    role_name,
+    password,
+    connection_limit = 10,
+  }) {
+    const cleanRole = cleanIdent(role_name);
+    const dumpPath = `${BRANCH_DIR}/${cleanRole}.dump`;
+    await run("mkdir", ["-p", BRANCH_DIR]);
+    await run("chown", ["-R", "postgres:postgres", "/var/backups/stashi"]);
+
+    const pooled = Boolean(source_pool_database && source_schema_name);
+    console.log(`[Job] Branching ${pooled ? source_schema_name : source_database_name} -> ${cleanRole}`);
+
+    if (pooled) {
+      const cleanSourceDb = cleanIdent(source_pool_database);
+      const cleanSourceSchema = cleanIdent(source_schema_name);
+      const cleanTargetDb = cleanIdent(target_pool_database);
+      const cleanTargetSchema = cleanIdent(target_schema_name);
+
+      await runAsPostgres("pg_dump", ["-Fc", "--compress=zstd:3", "-n", cleanSourceSchema, "-f", dumpPath, cleanSourceDb]);
+
+      await runPsql(
+        `CREATE ROLE "${cleanRole}" WITH LOGIN PASSWORD '${password.replace(/'/g, "''")}' NOSUPERUSER NOCREATEDB NOCREATEROLE CONNECTION LIMIT ${parseInt(connection_limit, 10)};`
+      );
+      await runPsql(`GRANT CONNECT, TEMP ON DATABASE "${cleanTargetDb}" TO "${cleanRole}";`);
+      await runPsql(`CREATE EXTENSION IF NOT EXISTS vector;`, ["-d", cleanTargetDb]);
+      await runPsql(`CREATE SCHEMA "${cleanTargetSchema}" AUTHORIZATION "${cleanRole}";`, ["-d", cleanTargetDb]);
+      await runPsql(`ALTER ROLE "${cleanRole}" IN DATABASE "${cleanTargetDb}" SET search_path = "${cleanTargetSchema}";`);
+
+      // The dump's tables are namespaced under the source schema name; a
+      // straight pg_restore would recreate that same schema name, not the
+      // new target's. --schema-mapping isn't a pg_restore option, so recreate
+      // the target schema under the source's name temporarily via search_path
+      // trickery is unnecessary here — pg_restore honors -n only for
+      // selecting what to restore, not renaming. Simplest correct approach:
+      // restore into a same-named schema, then rename it to the target name.
+      await runAsPostgres("pg_restore", ["-d", cleanTargetDb, dumpPath]);
+      if (cleanSourceSchema !== cleanTargetSchema) {
+        await runPsql(`DROP SCHEMA IF EXISTS "${cleanTargetSchema}" CASCADE;`, ["-d", cleanTargetDb]);
+        await runPsql(`ALTER SCHEMA "${cleanSourceSchema}" RENAME TO "${cleanTargetSchema}";`, ["-d", cleanTargetDb]);
+        await runPsql(`ALTER SCHEMA "${cleanTargetSchema}" OWNER TO "${cleanRole}";`, ["-d", cleanTargetDb]);
+      }
+    } else {
+      const cleanSourceDb = cleanIdent(source_database_name);
+      const cleanTargetDb = cleanIdent(target_database_name);
+
+      await runAsPostgres("pg_dump", ["-Fc", "--compress=zstd:3", "-f", dumpPath, cleanSourceDb]);
+
+      await runPsql(
+        `CREATE ROLE "${cleanRole}" WITH LOGIN PASSWORD '${password.replace(/'/g, "''")}' NOSUPERUSER NOCREATEDB NOCREATEROLE CONNECTION LIMIT ${parseInt(connection_limit, 10)};`
+      );
+      await runPsql(`CREATE DATABASE "${cleanTargetDb}" WITH OWNER = "${cleanRole}";`);
+      await runPsql(`REVOKE ALL ON DATABASE "${cleanTargetDb}" FROM PUBLIC;`);
+      await runPsql(`GRANT ALL ON DATABASE "${cleanTargetDb}" TO "${cleanRole}";`);
+      await runPsql(`CREATE EXTENSION IF NOT EXISTS vector;`, ["-d", cleanTargetDb]);
+      await runAsPostgres("pg_restore", ["-d", cleanTargetDb, dumpPath]);
+    }
+
+    if (fs.existsSync("/etc/pgbouncer/userlist.txt")) {
+      const scramHash = await runPsql(`SELECT rolpassword FROM pg_authid WHERE rolname = '${cleanRole}';`);
+      reloadPgbouncerAuth(cleanRole, scramHash);
+    }
+
+    await run("rm", ["-f", dumpPath]);
+    return { status: "ready", role: cleanRole };
   },
 
   // 2. Rotate Credentials
@@ -412,7 +501,25 @@ async function pollJobs() {
   }
 }
 
+// TTL Sweep — finds and deletes databases past their expiry. The control
+// plane decides who's expired (it owns that data); this just pings it on a
+// schedule, since Render has no built-in cron for the Next.js app to hang
+// one off of.
+const TTL_SWEEP_INTERVAL = parseInt(process.env.STASHI_TTL_SWEEP_INTERVAL_SEC || "300", 10) * 1000;
+async function sweepExpiredDatabases() {
+  try {
+    const res = await postControlPlane("/api/agent/ttl-sweep", { nodeId: NODE_ID });
+    if (res.reaped?.length) {
+      console.log(`[TTL Sweep] Reaped ${res.reaped.length} expired database(s):`, res.reaped.map((r) => r.name).join(", "));
+    }
+  } catch (err) {
+    console.error(`[TTL Sweep Error]: ${err.message}`);
+  }
+}
+
 console.log(`[Stashi Agent] Started for node: ${NODE_ID} (Region: ${REGION})`);
 pollJobs();
 setInterval(collectAndSendMetrics, METRICS_INTERVAL);
 collectAndSendMetrics();
+setInterval(sweepExpiredDatabases, TTL_SWEEP_INTERVAL);
+sweepExpiredDatabases();

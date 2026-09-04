@@ -53,6 +53,9 @@ export async function ensureSchema() {
     CREATE INDEX IF NOT EXISTS databases_owner_idx ON databases(owner_email);
     ALTER TABLE databases ADD COLUMN IF NOT EXISTS tenancy_mode text NOT NULL DEFAULT 'isolated';
     ALTER TABLE databases ADD COLUMN IF NOT EXISTS pool_schema text;
+    ALTER TABLE databases ADD COLUMN IF NOT EXISTS expires_at timestamptz;
+    ALTER TABLE databases ADD COLUMN IF NOT EXISTS parent_database_id text;
+    CREATE INDEX IF NOT EXISTS databases_expires_idx ON databases(expires_at) WHERE expires_at IS NOT NULL;
 
     CREATE TABLE IF NOT EXISTS activity (
       id text PRIMARY KEY,
@@ -110,6 +113,26 @@ export async function ensureSchema() {
     );
     CREATE INDEX IF NOT EXISTS checkpoints_database_idx ON checkpoints(database_id, created_at DESC);
     ALTER TABLE checkpoints ADD COLUMN IF NOT EXISTS off_node boolean NOT NULL DEFAULT false;
+
+    -- Per-agent scoped API keys. A database's primary api_key column stays
+    -- the full-access owner key (shown in the console's MCP config); these
+    -- are additional, individually revocable keys -- so a swarm of subagents
+    -- sharing one database still shows up as distinct actors in the audit
+    -- log, and a key can be minted read-only for an agent that should never
+    -- write.
+    CREATE TABLE IF NOT EXISTS scoped_keys (
+      id text PRIMARY KEY,
+      database_id text NOT NULL,
+      owner_email text NOT NULL REFERENCES users(email),
+      label text NOT NULL,
+      api_key text NOT NULL UNIQUE,
+      scope text NOT NULL DEFAULT 'full',
+      created_at timestamptz NOT NULL DEFAULT now(),
+      last_used_at timestamptz,
+      revoked_at timestamptz
+    );
+    CREATE INDEX IF NOT EXISTS scoped_keys_database_idx ON scoped_keys(database_id);
+    CREATE INDEX IF NOT EXISTS scoped_keys_lookup_idx ON scoped_keys(api_key) WHERE revoked_at IS NULL;
 
     INSERT INTO nodes (id, label, region, capacity_status)
     VALUES ('node-nj-01', 'NJ · 01', 'New Jersey, US', 'pending')

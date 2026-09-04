@@ -72,6 +72,7 @@ Before making any changes on the VPS:
    Configure `/etc/pgbouncer/pgbouncer.ini`:
    ```ini
    [databases]
+   ynai = host=127.0.0.1 port=5432 auth_user=postgres
    * = host=127.0.0.1 port=5432 auth_user=postgres
 
    [pgbouncer]
@@ -86,8 +87,8 @@ Before making any changes on the VPS:
    default_pool_size = 20
    min_pool_size = 5
    client_tls_sslmode = require
-   client_tls_key_file = /etc/ssl/stashi/privkey.pem
-   client_tls_cert_file = /etc/ssl/stashi/fullchain.pem
+   client_tls_key_file = /etc/pgbouncer/tls/server.key
+   client_tls_cert_file = /etc/pgbouncer/tls/server.crt
    ```
 
 3. **UFW Firewall Rules:**
@@ -95,6 +96,7 @@ Before making any changes on the VPS:
    sudo ufw default deny incoming
    sudo ufw default allow outgoing
    sudo ufw allow 22/tcp comment 'SSH'
+   sudo ufw allow 80/tcp comment 'Certbot HTTP-01 Renewal'
    sudo ufw allow 6432/tcp comment 'PgBouncer TLS'
    sudo ufw enable
    ```
