@@ -1,7 +1,7 @@
-import { cookies } from "next/headers";
 import { ensureSchema, getPool } from "./db";
 import { resolveScopedKey } from "./store";
 import type { ScopedKeyScope } from "./control-plane";
+import { auth } from "@/auth";
 
 // Three ways to prove you may act on a given database: a browser session
 // cookie (the console), the primary full-access Bearer STASHI_API_KEY shown
@@ -31,6 +31,7 @@ export async function resolveDatabaseAccess(
     return null;
   }
 
-  const email = (await cookies()).get("stashi_session")?.value;
+  const session = await auth();
+  const email = session?.user?.email;
   return email ? { email, via: "session", scope: "full" } : null;
 }

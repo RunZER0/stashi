@@ -147,6 +147,45 @@ export async function listDatabases(email: string): Promise<ManagedDatabase[]> {
   return rows.map(rowToDatabase);
 }
 
+// Registers an already-existing external Postgres database (real credentials
+// already provisioned outside Stashi, not one of our own tenants) against a
+// user's account -- no provisioning job, because there's nothing to
+// provision: the role and database already exist. Deliberately not exposed
+// as general self-serve "bring your own database"; that's a materially
+// different feature with its own abuse surface (arbitrary host/port from any
+// user is an SSRF-shaped risk for the SQL editor) that deserves its own
+// review before opening up. This is for attaching one specific,
+// operator-known external database, e.g. via a one-off script.
+export async function attachExistingDatabase(
+  email: string,
+  input: {
+    name: string;
+    plan: PlanId;
+    region: string;
+    host: string;
+    port: number;
+    database: string;
+    username: string;
+    password: string;
+  }
+): Promise<ManagedDatabase> {
+  await ensureSchema();
+  const pool = getPool();
+  await pool.query(`INSERT INTO users (email) VALUES ($1) ON CONFLICT (email) DO NOTHING`, [email]);
+
+  const id = newId("db").toUpperCase();
+  const apiKey = `st_live_${randomBytes(9).toString("hex")}`;
+
+  await pool.query(
+    `INSERT INTO databases (id, owner_email, name, plan, region, status, version, host, port, database_name, username, password, api_key, tenancy_mode, pool_schema)
+     VALUES ($1,$2,$3,$4,$5,'healthy','17',$6,$7,$8,$9,$10,$11,'isolated',NULL)`,
+    [id, email, input.name, input.plan, input.region, input.host, input.port, input.database, input.username, input.password, apiKey]
+  );
+
+  await pushActivity(email, "you", "database.attached", input.name);
+  return (await getDatabase(email, id))!;
+}
+
 export async function getDatabase(email: string, id: string): Promise<ManagedDatabase | null> {
   await ensureSchema();
   const { rows } = await getPool().query(`SELECT * FROM databases WHERE owner_email = $1 AND id = $2`, [email, id]);

@@ -1,7 +1,5 @@
-import { NextResponse } from "next/server";
+import { signOut } from "@/auth";
 
-export async function POST(request: Request) {
-  const response = NextResponse.redirect(new URL("/", request.url), 303);
-  response.cookies.set("stashi_session", "", { path: "/", maxAge: 0 });
-  return response;
+export async function POST() {
+  await signOut({ redirectTo: "/" });
 }

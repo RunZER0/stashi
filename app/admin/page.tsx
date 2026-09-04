@@ -1,13 +1,13 @@
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Clock3, Database, Server, ShieldCheck, Users, Zap } from "lucide-react";
 import { adminSummary } from "@/lib/store";
 import { getPlan } from "@/lib/plans";
+import { auth } from "@/auth";
 
 export default async function AdminPage() {
-  const session = (await cookies()).get("stashi_session")?.value;
-  if (!session) redirect("/login");
+  const session = await auth();
+  if (!session?.user?.email) redirect("/login");
 
   const summary = await adminSummary();
   const fixedMrr = summary.workspaces.reduce(

@@ -26,3 +26,13 @@ services:
         sync: false
       - key: BACKUP_BUCKET
         sync: false
+      - key: AUTH_SECRET
+        sync: false
+      - key: AUTH_GITHUB_ID
+        sync: false
+      - key: AUTH_GITHUB_SECRET
+        sync: false
+      - key: AUTH_GOOGLE_ID
+        sync: false
+      - key: AUTH_GOOGLE_SECRET
+        sync: false

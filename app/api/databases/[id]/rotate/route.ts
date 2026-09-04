@@ -1,10 +1,11 @@
 import { randomBytes } from "node:crypto";
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { recordActivity, updateDatabase } from "@/lib/store";
+import { auth } from "@/auth";
 
 export async function POST(_: Request, context: { params: Promise<{ id: string }> }) {
-  const email = (await cookies()).get("stashi_session")?.value;
+  const session = await auth();
+  const email = session?.user?.email;
   if (!email) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
 
   const { id } = await context.params;

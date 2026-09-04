@@ -1,10 +1,11 @@
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { requestPlanChange } from "@/lib/store";
 import type { PlanId } from "@/lib/plans";
+import { auth } from "@/auth";
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
-  const email = (await cookies()).get("stashi_session")?.value;
+  const session = await auth();
+  const email = session?.user?.email;
   if (!email) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
 
   const { id } = await context.params;
