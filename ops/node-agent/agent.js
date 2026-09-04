@@ -64,6 +64,20 @@ function runAsPostgres(cmd, args) {
   });
 }
 
+// Unlike runAsPostgres(), this treats any non-zero exit as a real failure —
+// used for the one place a partial, undetected failure would actually
+// matter: restoring a branch's plain-SQL dump under ON_ERROR_STOP=1, where
+// psql's own error text won't necessarily say FATAL/PANIC the way
+// pg_restore's benign "already exists" notices do.
+function runAsPostgresStrict(cmd, args) {
+  return new Promise((resolve, reject) => {
+    execFile("sudo", ["-u", "postgres", cmd, ...args], (error, stdout, stderr) => {
+      if (error) return reject(new Error(stderr || error.message));
+      resolve(stdout);
+    });
+  });
+}
+
 function reloadPgbouncerAuth(roleName, scramHashOrRemove) {
   if (!fs.existsSync("/etc/pgbouncer/userlist.txt")) return;
   const lines = fs
@@ -217,7 +231,32 @@ const JobHandlers = {
       const cleanTargetDb = cleanIdent(target_pool_database);
       const cleanTargetSchema = cleanIdent(target_schema_name);
 
-      await runAsPostgres("pg_dump", ["-Fc", "--compress=zstd:3", "-n", cleanSourceSchema, "-f", dumpPath, cleanSourceDb]);
+      // Pooled tenants all share ONE physical database (stashi_pool), and
+      // source/target are that same database — so "restore into a
+      // same-named schema, then rename" doesn't work here: the source
+      // schema name is permanently occupied by the live source tenant in
+      // this very database, not just temporarily during restore. Instead,
+      // dump in plain SQL (not the usual -Fc custom format) so the schema
+      // name can be text-replaced before restoring: pg_dump -n emits a
+      // `SET search_path = <schema>` directive followed by unqualified
+      // CREATE TABLE statements, so rewriting that one identifier
+      // redirects the whole dump into the target schema.
+      const sqlDumpPath = `${BRANCH_DIR}/${cleanRole}.sql`;
+      // --no-owner / --no-privileges: without these, the dump's ALTER
+      // TABLE ... OWNER TO / GRANT statements reference the SOURCE
+      // tenant's role by name (the schema-rename sed below only touches
+      // the schema identifier, not the role) — restored objects would
+      // silently end up owned by the wrong tenant. Ownership is
+      // transferred explicitly to the branch's own role after restore
+      // instead, scoped only to its new schema.
+      await runAsPostgres("pg_dump", ["--format=plain", "--no-owner", "--no-privileges", "-n", cleanSourceSchema, "-f", sqlDumpPath, cleanSourceDb]);
+      await run("sed", ["-i", `s/\\b${cleanSourceSchema}\\b/${cleanTargetSchema}/g`, sqlDumpPath]);
+      // pg_dump's plain output includes its own `CREATE SCHEMA` for the
+      // dumped schema (now renamed to the target above) — but the target
+      // schema is already pre-created below with the right owner, so make
+      // the dump's copy an IF NOT EXISTS no-op rather than a collision.
+      await run("sed", ["-i", `s/^CREATE SCHEMA ${cleanTargetSchema};/CREATE SCHEMA IF NOT EXISTS ${cleanTargetSchema};/`, sqlDumpPath]);
+      await run("chown", ["postgres:postgres", sqlDumpPath]);
 
       await runPsql(
         `CREATE ROLE "${cleanRole}" WITH LOGIN PASSWORD '${password.replace(/'/g, "''")}' NOSUPERUSER NOCREATEDB NOCREATEROLE CONNECTION LIMIT ${parseInt(connection_limit, 10)};`
@@ -225,26 +264,32 @@ const JobHandlers = {
       await runPsql(`GRANT CONNECT, TEMP ON DATABASE "${cleanTargetDb}" TO "${cleanRole}";`);
       await runPsql(`CREATE EXTENSION IF NOT EXISTS vector;`, ["-d", cleanTargetDb]);
       await runPsql(`CREATE SCHEMA "${cleanTargetSchema}" AUTHORIZATION "${cleanRole}";`, ["-d", cleanTargetDb]);
+      await runAsPostgresStrict("psql", ["-v", "ON_ERROR_STOP=1", "-d", cleanTargetDb, "-f", sqlDumpPath]);
+      // --no-owner leaves every restored table/sequence owned by postgres
+      // (whoever ran the restore) — hand real ownership to the branch's
+      // own role, scoped strictly to its own schema so this can't touch
+      // any other tenant's objects in this shared database.
+      await runPsql(
+        `DO $$ DECLARE r record; BEGIN
+           FOR r IN SELECT tablename FROM pg_tables WHERE schemaname = '${cleanTargetSchema}' LOOP
+             EXECUTE format('ALTER TABLE %I.%I OWNER TO %I', '${cleanTargetSchema}', r.tablename, '${cleanRole}');
+           END LOOP;
+           FOR r IN SELECT sequencename FROM pg_sequences WHERE schemaname = '${cleanTargetSchema}' LOOP
+             EXECUTE format('ALTER SEQUENCE %I.%I OWNER TO %I', '${cleanTargetSchema}', r.sequencename, '${cleanRole}');
+           END LOOP;
+         END $$;`,
+        ["-d", cleanTargetDb]
+      );
       await runPsql(`ALTER ROLE "${cleanRole}" IN DATABASE "${cleanTargetDb}" SET search_path = "${cleanTargetSchema}";`);
-
-      // The dump's tables are namespaced under the source schema name; a
-      // straight pg_restore would recreate that same schema name, not the
-      // new target's. --schema-mapping isn't a pg_restore option, so recreate
-      // the target schema under the source's name temporarily via search_path
-      // trickery is unnecessary here — pg_restore honors -n only for
-      // selecting what to restore, not renaming. Simplest correct approach:
-      // restore into a same-named schema, then rename it to the target name.
-      await runAsPostgres("pg_restore", ["-d", cleanTargetDb, dumpPath]);
-      if (cleanSourceSchema !== cleanTargetSchema) {
-        await runPsql(`DROP SCHEMA IF EXISTS "${cleanTargetSchema}" CASCADE;`, ["-d", cleanTargetDb]);
-        await runPsql(`ALTER SCHEMA "${cleanSourceSchema}" RENAME TO "${cleanTargetSchema}";`, ["-d", cleanTargetDb]);
-        await runPsql(`ALTER SCHEMA "${cleanTargetSchema}" OWNER TO "${cleanRole}";`, ["-d", cleanTargetDb]);
-      }
     } else {
       const cleanSourceDb = cleanIdent(source_database_name);
       const cleanTargetDb = cleanIdent(target_database_name);
 
-      await runAsPostgres("pg_dump", ["-Fc", "--compress=zstd:3", "-f", dumpPath, cleanSourceDb]);
+      // --no-owner / --no-privileges for the same reason as the pooled
+      // path above: without them, restored objects come back owned by the
+      // SOURCE database's role (embedded in the dump), not this branch's
+      // own new role. Reassigned explicitly after restore instead.
+      await runAsPostgres("pg_dump", ["-Fc", "--compress=zstd:3", "--no-owner", "--no-privileges", "-f", dumpPath, cleanSourceDb]);
 
       await runPsql(
         `CREATE ROLE "${cleanRole}" WITH LOGIN PASSWORD '${password.replace(/'/g, "''")}' NOSUPERUSER NOCREATEDB NOCREATEROLE CONNECTION LIMIT ${parseInt(connection_limit, 10)};`
@@ -254,6 +299,20 @@ const JobHandlers = {
       await runPsql(`GRANT ALL ON DATABASE "${cleanTargetDb}" TO "${cleanRole}";`);
       await runPsql(`CREATE EXTENSION IF NOT EXISTS vector;`, ["-d", cleanTargetDb]);
       await runAsPostgres("pg_restore", ["-d", cleanTargetDb, dumpPath]);
+      // A dedicated single-tenant database (not shared like stashi_pool),
+      // so reassigning everything in its default schema is safe — nothing
+      // else lives in it.
+      await runPsql(
+        `DO $$ DECLARE r record; BEGIN
+           FOR r IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' LOOP
+             EXECUTE format('ALTER TABLE %I.%I OWNER TO %I', 'public', r.tablename, '${cleanRole}');
+           END LOOP;
+           FOR r IN SELECT sequencename FROM pg_sequences WHERE schemaname = 'public' LOOP
+             EXECUTE format('ALTER SEQUENCE %I.%I OWNER TO %I', 'public', r.sequencename, '${cleanRole}');
+           END LOOP;
+         END $$;`,
+        ["-d", cleanTargetDb]
+      );
     }
 
     if (fs.existsSync("/etc/pgbouncer/userlist.txt")) {
@@ -261,7 +320,7 @@ const JobHandlers = {
       reloadPgbouncerAuth(cleanRole, scramHash);
     }
 
-    await run("rm", ["-f", dumpPath]);
+    await run("rm", ["-f", dumpPath, `${BRANCH_DIR}/${cleanRole}.sql`]);
     return { status: "ready", role: cleanRole };
   },
 

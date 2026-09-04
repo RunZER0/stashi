@@ -221,17 +221,22 @@ function vectorLiteral(embedding) {
 }
 
 async function ensureMemoryTable(dimension) {
+  // pgvector installs into the database's `public` schema (no SCHEMA
+  // clause on CREATE EXTENSION). That's invisible under a pooled tenant's
+  // search_path, which is deliberately scoped to just their own schema for
+  // isolation — so the vector type and its operator classes have to be
+  // referenced schema-qualified here regardless of tenancy mode.
   await runQuery(
     `CREATE TABLE IF NOT EXISTS ${MEMORY_TABLE} (
       id bigserial PRIMARY KEY,
       content text NOT NULL,
-      embedding vector(${dimension}) NOT NULL,
+      embedding public.vector(${dimension}) NOT NULL,
       metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
       created_at timestamptz NOT NULL DEFAULT now()
     )`
   );
   await runQuery(
-    `CREATE INDEX IF NOT EXISTS ${MEMORY_TABLE}_embedding_idx ON ${MEMORY_TABLE} USING hnsw (embedding vector_cosine_ops)`
+    `CREATE INDEX IF NOT EXISTS ${MEMORY_TABLE}_embedding_idx ON ${MEMORY_TABLE} USING hnsw (embedding public.vector_cosine_ops)`
   );
 }
 
@@ -285,8 +290,11 @@ server.registerTool(
   async ({ embedding, topK }) => {
     try {
       const limit = Math.min(Math.max(Number(topK) || 5, 1), 50);
+      // OPERATOR(public.<=>), not bare <=>: same search_path issue as the
+      // vector type itself — a pooled tenant's search_path doesn't include
+      // public, where pgvector's operators live.
       const result = await runQuery(
-        `SELECT id, content, metadata, created_at, embedding <=> '${vectorLiteral(embedding)}' AS distance
+        `SELECT id, content, metadata, created_at, embedding OPERATOR(public.<=>) '${vectorLiteral(embedding)}' AS distance
          FROM ${MEMORY_TABLE} ORDER BY distance ASC LIMIT ${limit}`
       );
       return textResult(result.rows);
