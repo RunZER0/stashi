@@ -178,6 +178,32 @@ server.registerTool(
 );
 
 server.registerTool(
+  "create_agent_key",
+  {
+    title: "Create a key for another agent",
+    description:
+      "Mint a new, separately-revocable API key scoped to this database — for handing off to a subagent instead of sharing this session's own key. Prefer scope 'readonly' unless the subagent genuinely needs to write; its actions will show up under its own label in the audit log, distinct from this session's.",
+    inputSchema: {
+      label: z.string().describe("Name for the subagent/purpose this key is for, e.g. 'research-subagent'"),
+      scope: z.enum(["full", "readonly"]).optional().describe("Defaults to 'readonly' — pass 'full' only if the subagent needs to write"),
+    },
+  },
+  async ({ label, scope }) => {
+    try {
+      const result = await callApi(`/api/databases/${DATABASE_ID}/keys`, {
+        method: "POST",
+        body: JSON.stringify({ label, scope: scope || "readonly" }),
+      });
+      return textResult(
+        `Created a ${result.key.scope} key labeled "${result.key.label}": ${result.key.apiKey}\nHand this to the subagent along with STASHI_DATABASE_ID=${DATABASE_ID} and STASHI_API_URL=${API_URL} — it will not be shown again in full.`
+      );
+    } catch (err) {
+      return errorResult(err);
+    }
+  }
+);
+
+server.registerTool(
   "create_branch",
   {
     title: "Create a branch",

@@ -6,8 +6,8 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
   const { id, keyId } = await context.params;
   const access = await resolveDatabaseAccess(request, id);
   if (!access) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
-  if (access.via !== "session") {
-    return NextResponse.json({ error: "Scoped keys can only be revoked from the console, not with an API key." }, { status: 403 });
+  if (access.scope !== "full") {
+    return NextResponse.json({ error: "This API key is read-only and can't revoke keys." }, { status: 403 });
   }
 
   try {
