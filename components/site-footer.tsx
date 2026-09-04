@@ -13,6 +13,7 @@ export function SiteFooter() {
         <div className="mk-footer-links">
           <Link href="/#agentic">Agentic Workflows</Link>
           <Link href="/pricing">Pricing</Link>
+          <Link href="/about">About</Link>
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
         </div>

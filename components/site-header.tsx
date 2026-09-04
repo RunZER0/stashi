@@ -10,6 +10,7 @@ export function SiteHeader() {
       <nav className="mk-nav" aria-label="Primary navigation">
         <Link href="/#agentic">Agentic Workflows</Link>
         <Link href="/pricing">Pricing</Link>
+        <Link href="/about">About</Link>
       </nav>
       <div className="mk-actions">
         <Link className="mk-signin" href="/login">Sign in</Link>
