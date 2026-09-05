@@ -214,7 +214,7 @@ export default function ConsoleClient({
       <aside className="sidebar">
         <div className="sidebar-brand">
           <Link href="/" className="brand">
-            stashi<span className="brand-dot">.</span>
+            <img src="/stashi-logo-light.png" alt="Stashi" height={30} style={{ height: "30px", width: "auto", display: "block" }} />
           </Link>
         </div>
         <div className="workspace-switcher">
@@ -440,7 +440,7 @@ export default function ConsoleClient({
 function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (
     <section className="data-panel" style={{ display: "grid", placeItems: "center", padding: "72px 24px", textAlign: "center", gap: "14px" }}>
-      <Sparkles size={22} color="var(--green)" />
+      <Sparkles size={22} color="var(--accent)" />
       <h2 style={{ margin: 0, fontSize: "22px" }}>No databases yet</h2>
       <p style={{ margin: 0, maxWidth: "420px", color: "var(--muted)", fontSize: "13px", lineHeight: 1.6 }}>
         Create your first PostgreSQL database to get a TLS connection string, MCP credentials, and a live console.
@@ -729,7 +729,7 @@ function AgentPanel({
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid var(--line)", paddingBottom: "8px" }}>
               <span style={{ color: "var(--muted)" }}>Loop Overages:</span>
-              <strong style={{ color: "var(--green)" }}>0% (Immune)</strong>
+              <strong style={{ color: "var(--accent)" }}>0% (Immune)</strong>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <span style={{ color: "var(--muted)" }}>Pool Concurrency:</span>

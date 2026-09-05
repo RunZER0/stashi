@@ -6,7 +6,7 @@ export function SiteFooter() {
       <div className="mk-wrap mk-footer-inner">
         <div>
           <Link className="mk-brand" href="/" aria-label="Stashi home">
-            stashi<span>.</span>
+            <img src="/stashi-logo-light.png" alt="Stashi" height={36} style={{ height: "36px", width: "auto", display: "block" }} />
           </Link>
           <p>Low-cost, agentic-tuned managed PostgreSQL with fixed monthly pricing from $1 a month.</p>
         </div>

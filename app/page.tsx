@@ -22,13 +22,13 @@ export default function Home() {
       {/* Hero Section */}
       <section className={styles.hero} style={{ position: "relative", zIndex: 2 }}>
         <div className={styles.heroCopy}>
-          <span className={styles.kicker} style={{ color: "#34d399", letterSpacing: ".12em" }}>
+          <span className={styles.kicker} style={{ color: "#1478fc", letterSpacing: ".12em" }}>
             Low-Cost · Agentic Tuned
           </span>
-          <h1 style={{ color: "#f5f6f4" }}>
+          <h1 style={{ color: "#f5f4f6" }}>
             Low-cost, agentic-tuned PostgreSQL from $1 a month.
           </h1>
-          <p style={{ color: "#a4aca3" }}>
+          <p style={{ color: "#a4a3ac" }}>
             Automatic provisioning via MCP &amp; REST, no ticket queue. Hard-capped fixed pricing from $1/mo protects you from runaway autonomous loop bills. PostgreSQL 17 with TLS and PgBouncer pooling.
           </p>
           <div className={styles.actions}>
@@ -46,17 +46,17 @@ export default function Home() {
               alignItems: "center",
               gap: "10px",
               fontSize: "11px",
-              color: "#859085",
+              color: "#858590",
               fontFamily: '"SFMono-Regular", Consolas, monospace',
             }}
           >
             <span>Quick MCP setup:</span>
             <code
               style={{
-                background: "rgba(17, 20, 17, 0.9)",
-                color: "#34d399",
+                background: "rgba(17, 17, 20, 0.9)",
+                color: "#1478fc",
                 padding: "5px 9px",
-                border: "1px solid #232b23",
+                border: "1px solid #23232b",
                 boxShadow: "0 2px 8px rgba(0, 0, 0, 0.4)",
               }}
             >
@@ -73,7 +73,7 @@ export default function Home() {
         <div className={styles.proofGrid}>
           <div className={styles.proofItem}>
             <span>ENTRY FLOOR</span>
-            <strong style={{ color: "#34d399" }}>$1 / month (Flat)</strong>
+            <strong style={{ color: "#1478fc" }}>$1 / month (Flat)</strong>
           </div>
           <div className={styles.proofItem}>
             <span>AGENTIC PROTOCOL</span>
@@ -94,14 +94,14 @@ export default function Home() {
       <section id="agentic" className="mk-wrap" style={{ padding: "112px 0 60px", position: "relative", zIndex: 2 }}>
         <div style={{ display: "grid", gridTemplateColumns: "1.2fr .8fr", gap: "60px", alignItems: "flex-end", marginBottom: "52px" }}>
           <div>
-            <span className={styles.kicker} style={{ color: "#34d399" }}>
+            <span className={styles.kicker} style={{ color: "#1478fc" }}>
               Agentic Infrastructure
             </span>
-            <h2 style={{ fontSize: "clamp(38px, 4.4vw, 58px)", lineHeight: "1.0", letterSpacing: "-.065em", margin: "14px 0 0", color: "#f5f6f4" }}>
+            <h2 style={{ fontSize: "clamp(38px, 4.4vw, 58px)", lineHeight: "1.0", letterSpacing: "-.065em", margin: "14px 0 0", color: "#f5f4f6" }}>
               Built for autonomous loops, subagent swarms, and MCP tools.
             </h2>
           </div>
-          <p style={{ color: "#8f988e", fontSize: "15px", lineHeight: "1.75", margin: 0 }}>
+          <p style={{ color: "#8f8e98", fontSize: "15px", lineHeight: "1.75", margin: 0 }}>
             When AI agents write schema, execute autonomous migrations, or store multi-agent memory, serverless compute meters can bankrupt you overnight. Stashi combines fast, automatic provisioning with hard-capped flat pricing and one-command checkpoint rollbacks.
           </p>
         </div>
@@ -112,28 +112,28 @@ export default function Home() {
           <div className="mk-bento-card mk-bento-7" style={{ minHeight: "260px", position: "relative", overflow: "hidden" }}>
             <div style={{ position: "relative", zIndex: 2 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                <span style={{ font: '700 9px/1 "SFMono-Regular", Consolas, monospace', color: "#34d399", letterSpacing: ".1em" }}>
+                <span style={{ font: '700 9px/1 "SFMono-Regular", Consolas, monospace', color: "#1478fc", letterSpacing: ".1em" }}>
                   01 / MODEL CONTEXT PROTOCOL
                 </span>
-                <span style={{ font: '700 8px/1 "SFMono-Regular", monospace', color: "#798378", border: "1px solid #232a23", padding: "3px 6px" }}>
+                <span style={{ font: '700 8px/1 "SFMono-Regular", monospace', color: "#797883", border: "1px solid #23232a", padding: "3px 6px" }}>
                   TOOL CALLING READY
                 </span>
               </div>
-              <h3 style={{ fontSize: "24px", letterSpacing: "-.04em", margin: "0 0 12px", color: "#f5f6f4", fontWeight: 700 }}>
+              <h3 style={{ fontSize: "24px", letterSpacing: "-.04em", margin: "0 0 12px", color: "#f5f4f6", fontWeight: 700 }}>
                 Native MCP Server for Claude, Cursor &amp; Antigravity
               </h3>
-              <p style={{ fontSize: "14px", lineHeight: "1.7", color: "#8f988e", margin: 0, maxWidth: "580px" }}>
+              <p style={{ fontSize: "14px", lineHeight: "1.7", color: "#8f8e98", margin: 0, maxWidth: "580px" }}>
                 Connect agents directly through standard Model Context Protocol. AI assistants inspect your schema, run scoped queries, and create or roll back checkpoints — through the same audited path a human's queries take, nothing hidden from your activity log.
               </p>
             </div>
             <div style={{ marginTop: "24px", display: "flex", gap: "10px", flexWrap: "wrap", position: "relative", zIndex: 2 }}>
-              <span style={{ font: '700 9px/1 "SFMono-Regular", monospace', color: "#a4b5a6", background: "#141914", border: "1px solid #242f24", padding: "5px 9px" }}>
+              <span style={{ font: '700 9px/1 "SFMono-Regular", monospace', color: "#a4a6b5", background: "#141419", border: "1px solid #24242f", padding: "5px 9px" }}>
                 Claude Code
               </span>
-              <span style={{ font: '700 9px/1 "SFMono-Regular", monospace', color: "#a4b5a6", background: "#141914", border: "1px solid #242f24", padding: "5px 9px" }}>
+              <span style={{ font: '700 9px/1 "SFMono-Regular", monospace', color: "#a4a6b5", background: "#141419", border: "1px solid #24242f", padding: "5px 9px" }}>
                 Cursor / Windsurf
               </span>
-              <span style={{ font: '700 9px/1 "SFMono-Regular", monospace', color: "#a4b5a6", background: "#141914", border: "1px solid #242f24", padding: "5px 9px" }}>
+              <span style={{ font: '700 9px/1 "SFMono-Regular", monospace', color: "#a4a6b5", background: "#141419", border: "1px solid #24242f", padding: "5px 9px" }}>
                 LangGraph &amp; LlamaIndex
               </span>
             </div>
@@ -143,23 +143,23 @@ export default function Home() {
           <div className="mk-bento-card mk-bento-5" style={{ minHeight: "260px" }}>
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                <span style={{ font: '700 9px/1 "SFMono-Regular", Consolas, monospace', color: "#34d399", letterSpacing: ".1em" }}>
+                <span style={{ font: '700 9px/1 "SFMono-Regular", Consolas, monospace', color: "#1478fc", letterSpacing: ".1em" }}>
                   02 / FINANCIAL GUARDRAIL
                 </span>
-                <span style={{ font: '700 8px/1 "SFMono-Regular", monospace', color: "#34d399" }}>
+                <span style={{ font: '700 8px/1 "SFMono-Regular", monospace', color: "#1478fc" }}>
                   100% HARD CAP
                 </span>
               </div>
-              <h3 style={{ fontSize: "22px", letterSpacing: "-.04em", margin: "0 0 12px", color: "#f5f6f4", fontWeight: 700 }}>
+              <h3 style={{ fontSize: "22px", letterSpacing: "-.04em", margin: "0 0 12px", color: "#f5f4f6", fontWeight: 700 }}>
                 Loop-Safe Flat Billing
               </h3>
-              <p style={{ fontSize: "13px", lineHeight: "1.7", color: "#8f988e", margin: 0 }}>
+              <p style={{ fontSize: "13px", lineHeight: "1.7", color: "#8f8e98", margin: 0 }}>
                 Autonomous reasoning loops running 24/7 will never spike your card. Hard billing caps at $1, $3, or $5/mo guarantee 0% runaway cloud bills.
               </p>
             </div>
-            <div style={{ marginTop: "20px", padding: "10px 12px", background: "#060706", border: "1px solid #1c221c", display: "flex", justifyContent: "space-between", fontSize: "10px", fontFamily: '"SFMono-Regular", monospace' }}>
-              <span style={{ color: "#798378" }}>Runaway Overage Risk:</span>
-              <strong style={{ color: "#34d399" }}>$0.00 Guaranteed</strong>
+            <div style={{ marginTop: "20px", padding: "10px 12px", background: "#060607", border: "1px solid #1c1c22", display: "flex", justifyContent: "space-between", fontSize: "10px", fontFamily: '"SFMono-Regular", monospace' }}>
+              <span style={{ color: "#797883" }}>Runaway Overage Risk:</span>
+              <strong style={{ color: "#1478fc" }}>$0.00 Guaranteed</strong>
             </div>
           </div>
 
@@ -167,23 +167,23 @@ export default function Home() {
           <div className="mk-bento-card mk-bento-6" style={{ minHeight: "220px" }}>
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
-                <span style={{ font: '700 9px/1 "SFMono-Regular", Consolas, monospace', color: "#34d399", letterSpacing: ".1em" }}>
+                <span style={{ font: '700 9px/1 "SFMono-Regular", Consolas, monospace', color: "#1478fc", letterSpacing: ".1em" }}>
                   03 / NO TICKET QUEUE
                 </span>
-                <span style={{ font: '700 8px/1 "SFMono-Regular", monospace', color: "#8f988e" }}>
+                <span style={{ font: '700 8px/1 "SFMono-Regular", monospace', color: "#8f8e98" }}>
                   AUTOMATIC PROVISIONING
                 </span>
               </div>
-              <h3 style={{ fontSize: "21px", letterSpacing: "-.03em", margin: "0 0 10px", color: "#f5f6f4", fontWeight: 700 }}>
+              <h3 style={{ fontSize: "21px", letterSpacing: "-.03em", margin: "0 0 10px", color: "#f5f4f6", fontWeight: 700 }}>
                 Isolated PostgreSQL in seconds
               </h3>
-              <p style={{ fontSize: "13px", lineHeight: "1.65", color: "#8f988e", margin: 0 }}>
+              <p style={{ fontSize: "13px", lineHeight: "1.65", color: "#8f8e98", margin: 0 }}>
                 Every plan gets its own role and schema, provisioned the moment you ask — no approval queue, no ticket, no human waiting on the other end for agent test runs or new tenant databases.
               </p>
             </div>
-            <div style={{ marginTop: "18px", display: "flex", alignItems: "center", gap: "12px", fontSize: "11px", fontFamily: '"SFMono-Regular", monospace', color: "#798378" }}>
+            <div style={{ marginTop: "18px", display: "flex", alignItems: "center", gap: "12px", fontSize: "11px", fontFamily: '"SFMono-Regular", monospace', color: "#797883" }}>
               <span>Measured provisioning time:</span>
-              <strong style={{ color: "#34d399" }}>~3s, typically under 5s</strong>
+              <strong style={{ color: "#1478fc" }}>~3s, typically under 5s</strong>
             </div>
           </div>
 
@@ -191,23 +191,23 @@ export default function Home() {
           <div className="mk-bento-card mk-bento-6" style={{ minHeight: "220px" }}>
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
-                <span style={{ font: '700 9px/1 "SFMono-Regular", Consolas, monospace', color: "#34d399", letterSpacing: ".1em" }}>
+                <span style={{ font: '700 9px/1 "SFMono-Regular", Consolas, monospace', color: "#1478fc", letterSpacing: ".1em" }}>
                   04 / RECOVERY GUARDRAIL
                 </span>
-                <span style={{ font: '700 8px/1 "SFMono-Regular", monospace', color: "#8f988e" }}>
+                <span style={{ font: '700 8px/1 "SFMono-Regular", monospace', color: "#8f8e98" }}>
                   ONE-COMMAND UNDO
                 </span>
               </div>
-              <h3 style={{ fontSize: "21px", letterSpacing: "-.03em", margin: "0 0 10px", color: "#f5f6f4", fontWeight: 700 }}>
+              <h3 style={{ fontSize: "21px", letterSpacing: "-.03em", margin: "0 0 10px", color: "#f5f4f6", fontWeight: 700 }}>
                 Checkpoint &amp; Rollback
               </h3>
-              <p style={{ fontSize: "13px", lineHeight: "1.65", color: "#8f988e", margin: 0 }}>
+              <p style={{ fontSize: "13px", lineHeight: "1.65", color: "#8f8e98", margin: 0 }}>
                 If an autonomous agent hallucinates a faulty migration or drops a critical relation, restore the last checkpoint with one command — no manual pg_restore, no DBA on call.
               </p>
             </div>
-            <div style={{ marginTop: "18px", display: "flex", alignItems: "center", gap: "12px", fontSize: "11px", fontFamily: '"SFMono-Regular", monospace', color: "#798378" }}>
+            <div style={{ marginTop: "18px", display: "flex", alignItems: "center", gap: "12px", fontSize: "11px", fontFamily: '"SFMono-Regular", monospace', color: "#797883" }}>
               <span>Measured rollback time:</span>
-              <strong style={{ color: "#34d399" }}>seconds, not manual hours</strong>
+              <strong style={{ color: "#1478fc" }}>seconds, not manual hours</strong>
             </div>
           </div>
         </div>
@@ -223,7 +223,7 @@ export default function Home() {
       <section className={styles.story} style={{ position: "relative", zIndex: 2 }}>
         <div className={styles.storyIntro}>
           <div>
-            <span className={styles.kicker} style={{ color: "#34d399" }}>From empty project to connected app</span>
+            <span className={styles.kicker} style={{ color: "#1478fc" }}>From empty project to connected app</span>
             <h2>The useful parts stay in view.</h2>
           </div>
           <p>
@@ -264,7 +264,7 @@ export default function Home() {
           <article className={`${styles.productRow} ${styles.productRowReverse}`}>
             <div className={styles.productFrame} aria-label="Connection credentials screen preview">
               <div className={styles.credentialWindow}>
-                <div className={styles.credentialTop}><span>CONNECTION</span><span style={{ color: "#34d399" }}>READY</span></div>
+                <div className={styles.credentialTop}><span>CONNECTION</span><span style={{ color: "#1478fc" }}>READY</span></div>
                 <div className={styles.credentialValue}>
                   <span>DATABASE URL</span>
                   <code>postgresql://inventory_owner:••••••••@db.stashi.dev:6432/inventory?sslmode=require</code>
@@ -297,7 +297,7 @@ export default function Home() {
             <img src={infraPhoto} alt="Close view of a populated server rack with network cabling" loading="lazy" />
             <a className={styles.photoCredit} href="https://unsplash.com/photos/a-rack-of-servers-in-a-server-room-2JJ3wBHu4_0" target="_blank" rel="noreferrer">Kevin Ache / Unsplash</a>
             <div className={styles.nodeOverlay}>
-              <div className={styles.nodeOverlayTop}><span>NODE / NJ-01</span><span style={{ color: "#34d399" }}>ACCEPTING DATABASES</span></div>
+              <div className={styles.nodeOverlayTop}><span>NODE / NJ-01</span><span style={{ color: "#1478fc" }}>ACCEPTING DATABASES</span></div>
               <div className={styles.nodeBars}>
                 <div className={styles.nodeBar}><span>CPU 34%</span><div className={styles.barTrack}><div className={styles.barFill} style={{ width: "34%" }} /></div></div>
                 <div className={styles.nodeBar}><span>MEMORY 61%</span><div className={styles.barTrack}><div className={styles.barFill} style={{ width: "61%" }} /></div></div>
@@ -323,7 +323,7 @@ export default function Home() {
       {/* PRICING PLANS */}
       <section className={styles.priceSection} style={{ position: "relative", zIndex: 2 }}>
         <div className={styles.priceLead}>
-          <span className={styles.kicker} style={{ color: "#34d399" }}>Pricing</span>
+          <span className={styles.kicker} style={{ color: "#1478fc" }}>Pricing</span>
           <h2>Fixed monthly plans. Zero loop surprises.</h2>
           <p>Start with the workload you have. Storage, connection limits and backup retention are published with each plan.</p>
           <Link className="mk-button mk-button-dark" href="/pricing">Compare plans <ArrowRight size={15} /></Link>

@@ -38,7 +38,7 @@ export function HeroVisual() {
 
       <div className={styles.dashboard}>
         {/* Toggle Mode Bar */}
-        <div style={{ display: "flex", borderBottom: "1px solid #1c221c", background: "#080a08" }}>
+        <div style={{ display: "flex", borderBottom: "1px solid #1c1c22", background: "#08080a" }}>
           <button
             type="button"
             onClick={() => setMode("agent")}
@@ -46,12 +46,12 @@ export function HeroVisual() {
               flex: 1,
               padding: "11px 14px",
               border: 0,
-              borderBottom: mode === "agent" ? "2px solid #34d399" : "2px solid transparent",
-              background: mode === "agent" ? "#111411" : "transparent",
+              borderBottom: mode === "agent" ? "2px solid #1478fc" : "2px solid transparent",
+              background: mode === "agent" ? "#111114" : "transparent",
               fontWeight: 700,
               fontSize: "10px",
               fontFamily: '"SFMono-Regular", Consolas, monospace',
-              color: mode === "agent" ? "#f5f6f4" : "#798378",
+              color: mode === "agent" ? "#f5f4f6" : "#797883",
               cursor: "pointer",
               letterSpacing: ".06em",
               transition: "all .15s ease",
@@ -66,12 +66,12 @@ export function HeroVisual() {
               flex: 1,
               padding: "11px 14px",
               border: 0,
-              borderBottom: mode === "db" ? "2px solid #34d399" : "2px solid transparent",
-              background: mode === "db" ? "#111411" : "transparent",
+              borderBottom: mode === "db" ? "2px solid #1478fc" : "2px solid transparent",
+              background: mode === "db" ? "#111114" : "transparent",
               fontWeight: 700,
               fontSize: "10px",
               fontFamily: '"SFMono-Regular", Consolas, monospace',
-              color: mode === "db" ? "#f5f6f4" : "#798378",
+              color: mode === "db" ? "#f5f4f6" : "#797883",
               cursor: "pointer",
               letterSpacing: ".06em",
               transition: "all .15s ease",
@@ -88,18 +88,18 @@ export function HeroVisual() {
               <b>CHECKPOINT SAVED (~2s)</b>
             </div>
 
-            <div style={{ padding: "16px 18px", background: "#060706", color: "#e8ece7", borderBottom: "1px solid #1c221c" }}>
+            <div style={{ padding: "16px 18px", background: "#060607", color: "#e8e7ec", borderBottom: "1px solid #1c1c22" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                <span style={{ font: '700 8px/1 "SFMono-Regular", monospace', color: "#798378", letterSpacing: ".06em" }}>
+                <span style={{ font: '700 8px/1 "SFMono-Regular", monospace', color: "#797883", letterSpacing: ".06em" }}>
                   TOOL INVOCATION (JSON)
                 </span>
                 <button
                   type="button"
                   onClick={() => copySnippet(agentSnippet)}
                   style={{
-                    border: "1px solid #2d382d",
-                    background: "#161c16",
-                    color: "#a4b5a6",
+                    border: "1px solid #2d2d38",
+                    background: "#16161c",
+                    color: "#a4a6b5",
                     fontSize: "9px",
                     padding: "3px 7px",
                     display: "flex",
@@ -110,7 +110,7 @@ export function HeroVisual() {
                     transition: "border-color .15s ease",
                   }}
                 >
-                  {copied ? <Check size={10} color="#34d399" /> : <Clipboard size={10} />}
+                  {copied ? <Check size={10} color="#1478fc" /> : <Clipboard size={10} />}
                   {copied ? "COPIED" : "COPY TOOL"}
                 </button>
               </div>
@@ -119,7 +119,7 @@ export function HeroVisual() {
                   margin: 0,
                   fontSize: "9px",
                   fontFamily: '"SFMono-Regular", Consolas, monospace',
-                  color: "#a2cbb1",
+                  color: "#a2b1cb",
                   lineHeight: 1.45,
                   overflowX: "auto",
                 }}
@@ -149,7 +149,7 @@ export function HeroVisual() {
             <div className={styles.connection}>
               <div className={styles.connectionLabel}>
                 <span>AGENT DATABASE URL</span>
-                <span style={{ color: "#34d399" }}>TLS + PGBOUNCER</span>
+                <span style={{ color: "#1478fc" }}>TLS + PGBOUNCER</span>
               </div>
               <code>postgresql://agent_scoped_role:••••••••@db.stashi.dev:6432/orders_api?sslmode=require</code>
             </div>
@@ -158,7 +158,7 @@ export function HeroVisual() {
           <div>
             <div className={styles.dashboardTop}>
               <span>STASHI / DATABASE</span>
-              <b style={{ color: "#34d399" }}>HEALTHY</b>
+              <b style={{ color: "#1478fc" }}>HEALTHY</b>
             </div>
             <div className={styles.dashboardHead}>
               <div>
@@ -187,7 +187,7 @@ export function HeroVisual() {
             <div className={styles.connection}>
               <div className={styles.connectionLabel}>
                 <span>CONNECTION STRING</span>
-                <span style={{ color: "#34d399" }}>TLS REQUIRED</span>
+                <span style={{ color: "#1478fc" }}>TLS REQUIRED</span>
               </div>
               <code>postgresql://payments_owner:••••••@db.stashi.dev:6432/payments?sslmode=require</code>
             </div>

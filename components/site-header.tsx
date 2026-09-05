@@ -5,7 +5,7 @@ export function SiteHeader() {
   return (
     <header className="mk-header mk-wrap">
       <Link className="mk-brand" href="/" aria-label="Stashi home">
-        stashi<span>.</span>
+        <img src="/stashi-logo-light.png" alt="Stashi" height={40} style={{ height: "40px", width: "auto", display: "block" }} />
       </Link>
       <nav className="mk-nav" aria-label="Primary navigation">
         <Link href="/#agentic">Agentic Workflows</Link>

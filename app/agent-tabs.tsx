@@ -54,9 +54,9 @@ const { rows } = await res.json();`,
   };
 
   return (
-    <div style={{ border: "1px solid #1e241e", background: "rgba(9, 11, 9, 0.7)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", color: "#e8ece7", marginTop: "32px", boxShadow: "0 20px 50px rgba(0, 0, 0, 0.45)" }}>
+    <div style={{ border: "1px solid #1e1e24", background: "rgba(9, 9, 11, 0.7)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", color: "#e8e7ec", marginTop: "32px", boxShadow: "0 20px 50px rgba(0, 0, 0, 0.45)" }}>
       {/* Code Header Tabs */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #1e241e", background: "#0c0e0c", padding: "0 12px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #1e1e24", background: "#0c0c0e", padding: "0 12px" }}>
         <div style={{ display: "flex", gap: "2px" }}>
           <button
             type="button"
@@ -64,9 +64,9 @@ const { rows } = await res.json();`,
             style={{
               padding: "11px 14px",
               border: 0,
-              borderBottom: tab === "mcp" ? "2px solid #34d399" : "2px solid transparent",
+              borderBottom: tab === "mcp" ? "2px solid #1478fc" : "2px solid transparent",
               background: "transparent",
-              color: tab === "mcp" ? "#f5f6f4" : "#798378",
+              color: tab === "mcp" ? "#f5f4f6" : "#797883",
               fontSize: "11px",
               fontWeight: 700,
               fontFamily: '"SFMono-Regular", Consolas, monospace',
@@ -83,9 +83,9 @@ const { rows } = await res.json();`,
             style={{
               padding: "11px 14px",
               border: 0,
-              borderBottom: tab === "python" ? "2px solid #34d399" : "2px solid transparent",
+              borderBottom: tab === "python" ? "2px solid #1478fc" : "2px solid transparent",
               background: "transparent",
-              color: tab === "python" ? "#f5f6f4" : "#798378",
+              color: tab === "python" ? "#f5f4f6" : "#797883",
               fontSize: "11px",
               fontWeight: 700,
               fontFamily: '"SFMono-Regular", Consolas, monospace',
@@ -102,9 +102,9 @@ const { rows } = await res.json();`,
             style={{
               padding: "11px 14px",
               border: 0,
-              borderBottom: tab === "ts" ? "2px solid #34d399" : "2px solid transparent",
+              borderBottom: tab === "ts" ? "2px solid #1478fc" : "2px solid transparent",
               background: "transparent",
-              color: tab === "ts" ? "#f5f6f4" : "#798378",
+              color: tab === "ts" ? "#f5f4f6" : "#797883",
               fontSize: "11px",
               fontWeight: 700,
               fontFamily: '"SFMono-Regular", Consolas, monospace',
@@ -121,9 +121,9 @@ const { rows } = await res.json();`,
             style={{
               padding: "11px 14px",
               border: 0,
-              borderBottom: tab === "rest" ? "2px solid #34d399" : "2px solid transparent",
+              borderBottom: tab === "rest" ? "2px solid #1478fc" : "2px solid transparent",
               background: "transparent",
-              color: tab === "rest" ? "#f5f6f4" : "#798378",
+              color: tab === "rest" ? "#f5f4f6" : "#797883",
               fontSize: "11px",
               fontWeight: 700,
               fontFamily: '"SFMono-Regular", Consolas, monospace',
@@ -140,9 +140,9 @@ const { rows } = await res.json();`,
           type="button"
           onClick={copyCode}
           style={{
-            border: "1px solid #2d382d",
-            background: "#151a15",
-            color: "#d8e2d9",
+            border: "1px solid #2d2d38",
+            background: "#15151a",
+            color: "#d8d9e2",
             fontSize: "10px",
             padding: "5px 10px",
             display: "flex",
@@ -153,7 +153,7 @@ const { rows } = await res.json();`,
             transition: "border-color .15s ease",
           }}
         >
-          {copied ? <Check size={11} color="#34d399" /> : <Clipboard size={11} />}
+          {copied ? <Check size={11} color="#1478fc" /> : <Clipboard size={11} />}
           {copied ? "COPIED" : "COPY CODE"}
         </button>
       </div>
@@ -166,7 +166,7 @@ const { rows } = await res.json();`,
             fontFamily: '"SFMono-Regular", Consolas, "Liberation Mono", monospace',
             fontSize: "12px",
             lineHeight: 1.6,
-            color: "#a4c9a8",
+            color: "#a4a8c9",
           }}
         >
           {snippets[tab]}

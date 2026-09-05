@@ -136,8 +136,8 @@ export function CheckpointsPanel({
                       className="tiny-badge"
                       style={{
                         marginLeft: "6px",
-                        color: c.offNode ? "var(--green)" : "var(--muted)",
-                        borderColor: c.offNode ? "rgba(52,211,153,.35)" : undefined,
+                        color: c.offNode ? "var(--accent)" : "var(--muted)",
+                        borderColor: c.offNode ? "rgba(20, 120, 252,.35)" : undefined,
                       }}
                       title={c.offNode ? "Copied off-node to Backblaze B2" : "Local only — off-node upload didn't complete"}
                     >

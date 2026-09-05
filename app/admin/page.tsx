@@ -23,7 +23,7 @@ export default async function AdminPage() {
       <header className="operator-header wrap-wide">
         <div style={{ display: "flex", alignItems: "center", gap: "28px" }}>
           <Link href="/" className="brand" aria-label="Stashi home">
-            stashi<span className="brand-dot">.</span>
+            <img src="/stashi-logo-light.png" alt="Stashi" height={32} style={{ height: "32px", width: "auto", display: "block" }} />
           </Link>
           <div>
             <Link href="/console" className="back-link"><ArrowLeft size={14}/> Control plane</Link>
