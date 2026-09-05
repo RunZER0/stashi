@@ -675,7 +675,7 @@ function AgentPanel({
           env: {
             STASHI_API_KEY: db.apiKey,
             STASHI_DATABASE_ID: db.id,
-            STASHI_API_URL: typeof window !== "undefined" ? window.location.origin : "https://stashi.onrender.com",
+            STASHI_API_URL: typeof window !== "undefined" ? window.location.origin : "https://www.mystashi.online",
             DATABASE_URL: connectionString,
           },
         },
