@@ -8,7 +8,7 @@ interface AmbientVideoBackgroundProps {
 }
 
 export function AmbientVideoBackground({
-  videoSrc = "/videos/ambient-code.mp4",
+  videoSrc = "/videos/ambient-server.mp4",
   posterSrc = "https://images.unsplash.com/photo-1545665277-5937489579f2?auto=format&fit=crop&w=1800&q=82",
 }: AmbientVideoBackgroundProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
