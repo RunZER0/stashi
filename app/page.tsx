@@ -1,10 +1,9 @@
 import Link from "next/link";
-import { ArrowRight, Copy } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { AmbientVideoBackground } from "@/components/ambient-video-background";
 import { HeroVisual } from "./hero-visual";
-import { AgentTabs } from "./agent-tabs";
 import { LiveAgentPlayground } from "@/components/live-agent-playground";
 import styles from "./marketing.module.css";
 
@@ -214,9 +213,6 @@ export default function Home() {
 
         {/* Live Interactive Agent Simulator Playground */}
         <LiveAgentPlayground />
-
-        {/* Copy-Pastable Code Tabs */}
-        <AgentTabs />
       </section>
 
       {/* DEVELOPER WORKFLOW STORY */}
@@ -333,18 +329,6 @@ export default function Home() {
           <div className={styles.priceTile}><span>STARTER</span><strong>$3</strong><p>Small apps and multi-agent memory.</p></div>
           <div className={styles.priceTile}><span>PRODUCTION</span><strong>$5</strong><p>High-concurrency swarms and active apps.</p></div>
           <div className={styles.priceTile}><span>DEDICATED</span><strong>$9+</strong><p>Continuous reasoning &amp; reserved capacity.</p></div>
-        </div>
-      </section>
-
-      {/* FINAL ACTION BANNER */}
-      <section className={styles.final} style={{ position: "relative", zIndex: 2 }}>
-        <img src={infraPhoto} alt="Server rack in a dark data center" loading="lazy" />
-        <div className={styles.finalInner}>
-          <div className={styles.finalCopy}>
-            <span className={styles.kicker}>Ready for agents &amp; developers</span>
-            <h2>Create a PostgreSQL database in seconds.</h2>
-          </div>
-          <Link className="mk-button mk-button-light" href="/login">Create database <ArrowRight size={16} /></Link>
         </div>
       </section>
 

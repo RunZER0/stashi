@@ -22,7 +22,7 @@
   height: 100%;
   object-fit: cover;
   object-position: center 42%;
-  filter: saturate(0.85) brightness(0.62) contrast(1.08);
+  filter: saturate(0.9) brightness(0.85) contrast(1.08);
   transform: scale(1.04);
   transition: opacity 1.2s ease;
 }
@@ -37,8 +37,8 @@
 .ambient-video-vignette {
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse 80% 50% at 50% 100%, rgba(8, 8, 10, 0.4) 0%, transparent 60%),
-    linear-gradient(180deg, rgba(8, 8, 9, 0.38) 0%, rgba(8, 8, 9, 0.42) 45%, rgba(8, 8, 9, 0.78) 100%);
+  background: radial-gradient(ellipse 80% 50% at 50% 100%, rgba(8, 8, 10, 0.32) 0%, transparent 60%),
+    linear-gradient(180deg, rgba(8, 8, 9, 0.22) 0%, rgba(8, 8, 9, 0.28) 45%, rgba(8, 8, 9, 0.68) 100%);
 }
 @media (prefers-reduced-motion: reduce) {
   .ambient-video-bg-el { display: none; }
