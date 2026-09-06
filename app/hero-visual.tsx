@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Clipboard, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Check, Clipboard, RotateCcw, ShieldCheck, Terminal } from "lucide-react";
 import styles from "./marketing.module.css";
 
 const steps = [
@@ -9,21 +9,25 @@ const steps = [
     label: "Agent runs a migration",
     detail: "ALTER TABLE orders DROP COLUMN status",
     tone: "neutral" as const,
+    icon: Terminal,
   },
   {
     label: "Stashi saves a checkpoint first",
     detail: "Every risky statement gets one, automatically",
     tone: "accent" as const,
+    icon: ShieldCheck,
   },
   {
     label: "The migration was wrong",
     detail: "Column dropped, feature branch breaks",
     tone: "warn" as const,
+    icon: AlertTriangle,
   },
   {
     label: "One command, fully restored",
     detail: "rollback_last_checkpoint() — zero data lost",
     tone: "good" as const,
+    icon: RotateCcw,
   },
 ];
 
@@ -47,7 +51,9 @@ export function HeroVisual() {
       <ol className={styles.storyTimeline}>
         {steps.map((step, i) => (
           <li key={step.label} className={styles.storyStep} data-tone={step.tone} style={{ animationDelay: `${i * 120}ms` }}>
-            <span className={styles.storyStepMarker} />
+            <span className={styles.storyStepMarker}>
+              <step.icon size={11} strokeWidth={2.5} />
+            </span>
             <div>
               <strong>{step.label}</strong>
               <code>{step.detail}</code>

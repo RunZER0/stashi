@@ -86,7 +86,7 @@
   align-items: center;
   font: 700 9px/1 "SFMono-Regular", Consolas, monospace;
   letter-spacing: .08em;
-  color: #797883;
+  color: #8f8e98;
   margin-bottom: 20px;
 }
 
@@ -142,17 +142,23 @@
   border: 1px solid #2c2c35;
   background: #111114;
   margin-top: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #5c5b64;
 }
 
 .storyStep[data-tone="accent"] .storyStepMarker,
 .storyStep[data-tone="good"] .storyStepMarker {
   border-color: #1478fc;
   background: rgba(20, 120, 252, .15);
+  color: #1478fc;
 }
 
 .storyStep[data-tone="warn"] .storyStepMarker {
   border-color: #fbbf24;
   background: rgba(251, 191, 36, .15);
+  color: #fbbf24;
 }
 
 .storyStep strong {
@@ -166,7 +172,7 @@
   display: block;
   margin-top: 4px;
   font-size: 11px;
-  color: #797883;
+  color: #8f8e98;
   font-family: "SFMono-Regular", Consolas, monospace;
 }
 
@@ -194,7 +200,7 @@
   gap: 8px;
   background: #060607;
   border: 1px solid #1e1e24;
-  color: #797883;
+  color: #8f8e98;
   padding: 11px 12px;
   cursor: pointer;
   font-size: 11px;
@@ -203,6 +209,12 @@
 
 .storyCopy:hover {
   border-color: #2c2c35;
+}
+
+.storyCopy:focus-visible {
+  outline: 2px solid #1478fc;
+  outline-offset: 2px;
+  border-color: #1478fc;
 }
 
 .storyCopy code {
