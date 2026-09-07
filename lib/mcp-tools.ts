@@ -1,5 +1,11 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { POST as queryRoute } from "@/app/api/databases/[id]/query/route";
+import { GET as checkpointsGetRoute, POST as checkpointsPostRoute } from "@/app/api/databases/[id]/checkpoints/route";
+import { POST as restoreRoute } from "@/app/api/databases/[id]/checkpoints/[checkpointId]/restore/route";
+import { POST as keysPostRoute } from "@/app/api/databases/[id]/keys/route";
+import { POST as branchRoute } from "@/app/api/databases/[id]/branch/route";
+import { GET as databasesGetRoute } from "@/app/api/databases/route";
 
 // Registers the same tool set as mcp-server/index.js (the local stdio
 // package for Claude Desktop/Cursor/Windsurf), adapted for the remote HTTP
@@ -12,12 +18,20 @@ import { z } from "zod";
 // locally, this one runs inside the Next.js server), so there's no shared
 // module to import from.
 //
-// Every tool still calls the same internal REST endpoints
-// (/api/databases/:id/...) that the console and the stdio server use,
-// rather than touching Postgres or the store directly here -- that's what
-// keeps auto-checkpointing, destructive-statement blocking, read-only
-// enforcement, and the audit log all in the one real code path regardless
-// of which door an agent came in through.
+// Every tool still runs through the same route handlers
+// (/api/databases/:id/...) that the console and the stdio server use --
+// that's what keeps auto-checkpointing, destructive-statement blocking,
+// read-only enforcement, and the audit log all in the one real code path
+// regardless of which door an agent came in through. Called *directly* as
+// in-process functions (invokeRoute below), not over HTTP: a self-fetch
+// from this server back to its own public URL is exactly the kind of call
+// that silently breaks on PaaS platforms like Render, where a service's
+// outbound request often can't route back to its own public ingress
+// (confirmed here -- the same endpoint answered instantly for an external
+// caller and failed with "fetch failed" for this server calling itself).
+// Importing the route modules and invoking their exported handlers
+// directly sidesteps the network hop entirely while still reusing their
+// logic unchanged.
 //
 // Two ways to register these, depending on what kind of key connected:
 //   - registerDatabaseTools: a per-database key (primary or scoped).
@@ -35,24 +49,34 @@ export type BaseMcpContext = {
   apiKey: string;
 };
 
-async function callApi(ctx: BaseMcpContext, path: string, options: RequestInit = {}) {
-  const res = await fetch(`${ctx.origin}${path}`, {
-    ...options,
+// A route handler only ever reads request.url for its own querystring (none
+// of the routes called here have one) -- the value just has to be a
+// syntactically valid absolute URL, never actually dispatched anywhere.
+const INTERNAL_URL = "http://internal.invalid/";
+
+async function invokeRoute<T = any>(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  handler: (request: Request, context: any) => Promise<Response>,
+  opts: { apiKey: string; method: "GET" | "POST"; params?: Record<string, string>; body?: unknown }
+): Promise<T> {
+  const request = new Request(INTERNAL_URL, {
+    method: opts.method,
     headers: {
       "content-type": "application/json",
-      authorization: `Bearer ${ctx.apiKey}`,
-      ...(options.headers || {}),
+      authorization: `Bearer ${opts.apiKey}`,
     },
+    body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
   });
-  const payload = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(payload.error || `Stashi API returned ${res.status}`);
+  const response = await handler(request, { params: Promise.resolve(opts.params ?? {}) });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || `Stashi internal call returned ${response.status}`);
   }
-  return payload;
+  return payload as T;
 }
 
 const runQuery = (ctx: BaseMcpContext, databaseId: string, sql: string) =>
-  callApi(ctx, `/api/databases/${databaseId}/query`, { method: "POST", body: JSON.stringify({ sql }) });
+  invokeRoute(queryRoute, { apiKey: ctx.apiKey, method: "POST", params: { id: databaseId }, body: { sql } });
 
 function textResult(value: unknown) {
   return { content: [{ type: "text" as const, text: typeof value === "string" ? value : JSON.stringify(value, null, 2) }] };
@@ -97,7 +121,7 @@ async function ensureMemoryTable(ctx: BaseMcpContext, databaseId: string, dimens
 
 async function actionListDatabases(ctx: BaseMcpContext) {
   try {
-    const result = await callApi(ctx, `/api/databases`);
+    const result = await invokeRoute<{ databases: any[] }>(databasesGetRoute, { apiKey: ctx.apiKey, method: "GET" });
     const databases = (result.databases || []).map((d: any) => ({
       id: d.id,
       name: d.name,
@@ -163,9 +187,11 @@ async function actionRunQuery(ctx: BaseMcpContext, databaseId: string, sql: stri
 
 async function actionCreateCheckpoint(ctx: BaseMcpContext, databaseId: string, label?: string) {
   try {
-    const result = await callApi(ctx, `/api/databases/${databaseId}/checkpoints`, {
+    const result = await invokeRoute<{ checkpoint: { id: string; label: string } }>(checkpointsPostRoute, {
+      apiKey: ctx.apiKey,
       method: "POST",
-      body: JSON.stringify({ kind: "checkpoint", label: label || "Agent checkpoint" }),
+      params: { id: databaseId },
+      body: { kind: "checkpoint", label: label || "Agent checkpoint" },
     });
     return textResult(`Checkpoint "${result.checkpoint.label}" (${result.checkpoint.id}) is being created.`);
   } catch (err) {
@@ -175,10 +201,14 @@ async function actionCreateCheckpoint(ctx: BaseMcpContext, databaseId: string, l
 
 async function actionRollbackLastCheckpoint(ctx: BaseMcpContext, databaseId: string) {
   try {
-    const list = await callApi(ctx, `/api/databases/${databaseId}/checkpoints`);
-    const latest = (list.checkpoints || []).find((c: { status: string }) => c.status === "ready");
+    const list = await invokeRoute<{ checkpoints: { id: string; label: string; status: string }[] }>(checkpointsGetRoute, {
+      apiKey: ctx.apiKey,
+      method: "GET",
+      params: { id: databaseId },
+    });
+    const latest = (list.checkpoints || []).find((c) => c.status === "ready");
     if (!latest) return textResult("No ready checkpoint to roll back to yet — call create_checkpoint first.");
-    await callApi(ctx, `/api/databases/${databaseId}/checkpoints/${latest.id}/restore`, { method: "POST" });
+    await invokeRoute(restoreRoute, { apiKey: ctx.apiKey, method: "POST", params: { id: databaseId, checkpointId: latest.id } });
     return textResult(`Rolling back to checkpoint "${latest.label}" (${latest.id}). This database will be briefly unavailable.`);
   } catch (err) {
     return errorResult(err);
@@ -187,9 +217,11 @@ async function actionRollbackLastCheckpoint(ctx: BaseMcpContext, databaseId: str
 
 async function actionCreateAgentKey(ctx: BaseMcpContext, databaseId: string, label: string, scope?: "full" | "readonly") {
   try {
-    const result = await callApi(ctx, `/api/databases/${databaseId}/keys`, {
+    const result = await invokeRoute<{ key: { label: string; scope: string; apiKey: string } }>(keysPostRoute, {
+      apiKey: ctx.apiKey,
       method: "POST",
-      body: JSON.stringify({ label, scope: scope || "readonly" }),
+      params: { id: databaseId },
+      body: { label, scope: scope || "readonly" },
     });
     return textResult(
       `Created a ${result.key.scope} key labeled "${result.key.label}": ${result.key.apiKey}\nHand this to the subagent along with STASHI_DATABASE_ID=${databaseId} and STASHI_API_URL=${ctx.origin} — it will not be shown again in full.`
@@ -201,9 +233,11 @@ async function actionCreateAgentKey(ctx: BaseMcpContext, databaseId: string, lab
 
 async function actionCreateBranch(ctx: BaseMcpContext, databaseId: string, name: string, ttlHours?: number) {
   try {
-    const result = await callApi(ctx, `/api/databases/${databaseId}/branch`, {
+    const result = await invokeRoute<{ database: { id: string; name: string } }>(branchRoute, {
+      apiKey: ctx.apiKey,
       method: "POST",
-      body: JSON.stringify({ name, ttlHours }),
+      params: { id: databaseId },
+      body: { name, ttlHours },
     });
     return textResult(
       `Branch "${result.database.name}" (${result.database.id}) is being created from a live dump of this database.${ttlHours ? ` Auto-deletes in ${ttlHours}h.` : ""} Connect with its own credentials once its status is "healthy" (check via the console, or list_tables against the new id once you have its API key).`
