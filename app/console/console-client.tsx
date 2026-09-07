@@ -5,22 +5,23 @@ import Link from "next/link";
 import {
   Activity,
   ArrowLeft,
-  Bot,
   Check,
   ChevronDown,
   Clipboard,
+  Cpu,
   Database,
   Gauge,
   GitBranch,
   HardDrive,
   KeyRound,
+  LogOut,
   MoreHorizontal,
   Plus,
   RefreshCcw,
   RotateCcw,
   Server,
   ShieldCheck,
-  Sparkles,
+  SlidersHorizontal,
   Terminal,
   Trash2,
   X,
@@ -73,6 +74,8 @@ export default function ConsoleClient({
   const [planChangeOpen, setPlanChangeOpen] = useState(false);
   const [changingPlan, setChangingPlan] = useState(false);
   const [busyAction, setBusyAction] = useState<"rotate" | "suspend" | "delete" | null>(null);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [quickMenuOpen, setQuickMenuOpen] = useState(false);
 
   const db = useMemo(() => databases.find((item) => item.id === activeId) ?? null, [databases, activeId]);
   const plan = db ? getPlan(db.plan) : null;
@@ -217,22 +220,42 @@ export default function ConsoleClient({
             <img src="/stashi-logo-light.png" alt="Stashi" height={30} style={{ height: "30px", width: "auto", display: "block" }} />
           </Link>
         </div>
-        <div className="workspace-switcher">
-          <span className="workspace-avatar">{email.charAt(0).toUpperCase()}</span>
-          <div>
-            <strong>{workspaceLabel(email)}</strong>
-            <small>{email}</small>
-          </div>
-          <ChevronDown size={14} />
+        <div className="workspace-switcher-wrap">
+          <button
+            className="workspace-switcher"
+            onClick={() => setAccountMenuOpen((v) => !v)}
+            aria-haspopup="menu"
+            aria-expanded={accountMenuOpen}
+          >
+            <span className="workspace-avatar">{email.charAt(0).toUpperCase()}</span>
+            <div>
+              <strong>{workspaceLabel(email)}</strong>
+              <small>{email}</small>
+            </div>
+            <ChevronDown size={14} />
+          </button>
+          {accountMenuOpen && (
+            <>
+              <div className="menu-scrim" onClick={() => setAccountMenuOpen(false)} />
+              <div className="quick-menu" role="menu">
+                <span className="quick-menu-label">{email}</span>
+                <form action="/api/logout" method="post">
+                  <button className="quick-menu-item" type="submit">
+                    <LogOut size={14} /> Sign out
+                  </button>
+                </form>
+              </div>
+            </>
+          )}
         </div>
         <nav className="side-nav">
-          <button className="side-nav-active">
+          <button className={tab === "overview" ? "side-nav-active" : undefined} onClick={() => setTab("overview")}>
             <Database size={15} /> Databases <span>{databases.length}</span>
           </button>
-          <button onClick={() => setTab("agent")} disabled={!db}>
-            <Bot size={15} /> Agent &amp; MCP
+          <button className={tab === "agent" ? "side-nav-active" : undefined} onClick={() => setTab("agent")} disabled={!db}>
+            <Cpu size={15} /> Agent &amp; MCP
           </button>
-          <button onClick={() => setTab("activity")}>
+          <button className={tab === "activity" ? "side-nav-active" : undefined} onClick={() => setTab("activity")}>
             <Activity size={15} /> Activity
           </button>
           <Link href="/admin">
@@ -290,9 +313,65 @@ export default function ConsoleClient({
                 {db.status.toUpperCase()}
               </span>
             )}
-            <button className="icon-button" aria-label="More actions">
-              <MoreHorizontal size={16} />
-            </button>
+            {db && (
+              <div className="quick-menu-anchor">
+                <button
+                  className="icon-button"
+                  aria-label="More actions"
+                  aria-haspopup="menu"
+                  aria-expanded={quickMenuOpen}
+                  onClick={() => setQuickMenuOpen((v) => !v)}
+                >
+                  <MoreHorizontal size={16} />
+                </button>
+                {quickMenuOpen && (
+                  <>
+                    <div className="menu-scrim" onClick={() => setQuickMenuOpen(false)} />
+                    <div className="quick-menu quick-menu-right" role="menu">
+                      <button
+                        className="quick-menu-item"
+                        onClick={() => {
+                          setQuickMenuOpen(false);
+                          setTab("settings");
+                        }}
+                      >
+                        <SlidersHorizontal size={14} /> Settings
+                      </button>
+                      <button
+                        className="quick-menu-item"
+                        onClick={() => {
+                          setQuickMenuOpen(false);
+                          rotatePassword();
+                        }}
+                        disabled={busyAction === "rotate"}
+                      >
+                        <RefreshCcw size={14} /> Rotate credentials
+                      </button>
+                      <button
+                        className="quick-menu-item"
+                        onClick={() => {
+                          setQuickMenuOpen(false);
+                          toggleSuspend();
+                        }}
+                        disabled={busyAction === "suspend"}
+                      >
+                        <Server size={14} /> {db.status === "suspended" ? "Resume database" : "Suspend database"}
+                      </button>
+                      <button
+                        className="quick-menu-item quick-menu-danger"
+                        onClick={() => {
+                          setQuickMenuOpen(false);
+                          deleteDatabase();
+                        }}
+                        disabled={busyAction === "delete"}
+                      >
+                        <Trash2 size={14} /> Delete database
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </header>
 
@@ -440,7 +519,7 @@ export default function ConsoleClient({
 function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (
     <section className="data-panel" style={{ display: "grid", placeItems: "center", padding: "72px 24px", textAlign: "center", gap: "14px" }}>
-      <Sparkles size={22} color="var(--accent)" />
+      <Database size={22} color="var(--accent)" />
       <h2 style={{ margin: 0, fontSize: "22px" }}>No databases yet</h2>
       <p style={{ margin: 0, maxWidth: "420px", color: "var(--muted)", fontSize: "13px", lineHeight: 1.6 }}>
         Create your first PostgreSQL database to get a TLS connection string, MCP credentials, and a live console.
@@ -493,7 +572,7 @@ function Overview({
           sub={db.p95LatencyMs === null ? "no traffic yet" : "last 60 minutes"}
           pct={db.p95LatencyMs === null ? 0 : Math.min(100, db.p95LatencyMs / 2)}
         />
-        <Metric icon={<Bot size={16} />} label="Agent & MCP" value="Ready" sub="Guardrails active" pct={100} />
+        <Metric icon={<Cpu size={16} />} label="Agent & MCP" value="Ready" sub="Guardrails active" pct={100} />
       </div>
       <div className="content-grid two-one">
         <section className="data-panel">
@@ -702,7 +781,7 @@ function AgentPanel({
           </button>
         </div>
         <div className="big-code" style={{ padding: "18px", borderRadius: "0" }}>
-          <Bot size={16} />
+          <Cpu size={16} />
           <pre style={{ margin: 0, fontSize: "11px", color: "#a5caa9", overflowX: "auto" }}>{mcpConfig}</pre>
         </div>
         <p className="panel-footnote">
@@ -1213,7 +1292,7 @@ function CreateModal({
             <ShieldCheck size={14} /> TLS required
           </span>
           <span>
-            <Bot size={14} /> MCP enabled
+            <Cpu size={14} /> MCP enabled
           </span>
         </div>
         <div className="modal-actions">
