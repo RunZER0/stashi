@@ -72,17 +72,24 @@ export default function DocsPage() {
             <p>
               The config above spawns a local process — that works for Claude Desktop, Cursor, and Windsurf,
               but ChatGPT&rsquo;s Developer Mode connectors (and anything else that can&rsquo;t run a command on
-              your machine) need a public HTTPS endpoint instead. Same nine tools, same auth, over MCP&rsquo;s
-              Streamable HTTP transport:
+              your machine) need a public HTTPS endpoint instead. Same nine tools, same auth model, over
+              MCP&rsquo;s Streamable HTTP transport. Two variants, depending on what the client supports:
             </p>
-            <pre style={codeBlockStyle}>{`URL:   https://www.mystashi.online/mcp
-Auth:  Authorization: Bearer <your STASHI_API_KEY>`}</pre>
+            <pre style={codeBlockStyle}>{`Custom-header clients:
+URL:   https://www.mystashi.online/mcp
+Auth:  Authorization: Bearer <your STASHI_API_KEY>
+
+ChatGPT ("New Plugin" only offers No Auth or OAuth — no header field):
+URL:   https://www.mystashi.online/mcp/<your STASHI_API_KEY>
+Auth:  leave set to "No Auth" — the key in the URL is the credential`}</pre>
             <p>
               In ChatGPT: Settings → Security and login → turn on Developer mode, then Plugins → + → paste
-              that URL under Connection, and set your API key as the connector&rsquo;s auth token. The URL and
-              key are also on your console&rsquo;s Agent &amp; MCP tab, under &ldquo;ChatGPT &amp; other remote
+              the second URL under Connection, leave Authentication on &ldquo;No Auth,&rdquo; and create. Both
+              URLs are also on your console&rsquo;s Agent &amp; MCP tab, under &ldquo;ChatGPT &amp; other remote
               connectors.&rdquo; The endpoint is stateless — it resolves which database a request is scoped to
-              from the API key on every call, so there&rsquo;s nothing to configure beyond the URL and the key.
+              from whichever key it finds (header first, then the URL) on every call, so there&rsquo;s nothing
+              else to configure. Treat the key-in-URL form like any other copy of your API key: whoever has it
+              can act as that database.
             </p>
 
             <h2 id="query">Running a query without MCP</h2>

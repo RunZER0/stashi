@@ -751,7 +751,9 @@ function AgentPanel({
     2
   );
 
-  const mcpUrl = `${typeof window !== "undefined" ? window.location.origin : "https://www.mystashi.online"}/mcp`;
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://www.mystashi.online";
+  const mcpUrl = `${origin}/mcp`;
+  const mcpUrlWithKey = `${origin}/mcp/${db.apiKey}`;
 
   return (
     <div className="panel-stack">
@@ -786,23 +788,27 @@ function AgentPanel({
             <h3>ChatGPT &amp; other remote connectors</h3>
           </div>
         </div>
+        <p className="panel-footnote" style={{ marginTop: 0, paddingTop: 0, borderTop: "none" }}>
+          ChatGPT&apos;s connector setup only offers &ldquo;No Auth&rdquo; or OAuth &mdash; no field for a custom
+          header. This URL carries your key itself, the same way a webhook secret would, so &ldquo;No Auth&rdquo;
+          still works. Treat it like the key it contains: anyone with this URL can act as this database.
+        </p>
         <div className="connection-box">
-          <code>{mcpUrl}</code>
-          <button onClick={() => copy(mcpUrl, "MCP server URL copied")}>
-            <Clipboard size={14} /> Copy
-          </button>
+          <code>{showKey ? mcpUrlWithKey : mcpUrlWithKey.replace(db.apiKey, "••••••••••••••••••••")}</code>
+          <button onClick={() => setShowKey(!showKey)}>{showKey ? "Hide" : "Reveal"}</button>
         </div>
         <div className="credential-table">
           <div>
-            <span>Auth</span>
-            <code>Bearer {showKey ? db.apiKey : "••••••••••••••••••••"}</code>
-            <button onClick={() => setShowKey(!showKey)}>{showKey ? "Hide" : "Reveal"}</button>
+            <span>Copy URL</span>
+            <code>for ChatGPT&apos;s Connection field</code>
+            <button onClick={() => copy(mcpUrlWithKey, "MCP URL (with key) copied")}>Copy</button>
           </div>
         </div>
         <p className="panel-footnote">
-          In ChatGPT: Settings → Security and login → turn on Developer mode, then Plugins → + →
-          paste this URL under Connection, and set the API key above as the connector&apos;s auth token. Same tools
-          as the config above, over HTTP instead of a local process.
+          In ChatGPT: Settings → Security and login → turn on Developer mode, then Plugins → + → paste the
+          URL above under Connection, leave Authentication set to &ldquo;No Auth,&rdquo; and create. For clients
+          that <em>do</em> support a custom header instead, use <code>{mcpUrl}</code> with{" "}
+          <code>Authorization: Bearer {"<your API key>"}</code>.
         </p>
       </section>
 
