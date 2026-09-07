@@ -55,11 +55,39 @@ class OneShotTransport {
   }
 }
 
+// ChatGPT's connector-creation step (and likely the tool-call path too, at
+// least in part) runs as a direct browser fetch from chatgpt.com to this
+// URL, not purely server-to-server -- without these headers the browser
+// blocks the request after preflight and the failure shows up client-side
+// as an opaque "Something went wrong", with nothing useful in the response
+// body to diagnose from. Wide open (`*`) rather than an origin allowlist
+// since every credential here is the Bearer key itself, not a cookie --
+// there's no session for a third-party page to ride on.
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, Mcp-Session-Id, Mcp-Protocol-Version",
+  "Access-Control-Expose-Headers": "Mcp-Session-Id",
+};
+
+function withCors(response: NextResponse) {
+  for (const [key, value] of Object.entries(CORS_HEADERS)) {
+    response.headers.set(key, value);
+  }
+  return response;
+}
+
 function unauthorized() {
-  return NextResponse.json(
-    { jsonrpc: "2.0", error: { code: -32001, message: "Missing or invalid Stashi API key" }, id: null },
-    { status: 401 }
+  return withCors(
+    NextResponse.json(
+      { jsonrpc: "2.0", error: { code: -32001, message: "Missing or invalid Stashi API key" }, id: null },
+      { status: 401 }
+    )
   );
+}
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204, headers: CORS_HEADERS });
 }
 
 export async function POST(request: Request) {
@@ -72,9 +100,11 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => null);
   if (!body) {
-    return NextResponse.json(
-      { jsonrpc: "2.0", error: { code: -32700, message: "Parse error" }, id: null },
-      { status: 400 }
+    return withCors(
+      NextResponse.json(
+        { jsonrpc: "2.0", error: { code: -32700, message: "Parse error" }, id: null },
+        { status: 400 }
+      )
     );
   }
 
@@ -99,15 +129,17 @@ export async function POST(request: Request) {
 
   if (responses.length === 0) {
     // Pure notification(s), nothing to report back.
-    return new Response(null, { status: 202 });
+    return new Response(null, { status: 202, headers: CORS_HEADERS });
   }
 
-  return NextResponse.json(Array.isArray(body) ? responses : responses[0]);
+  return withCors(NextResponse.json(Array.isArray(body) ? responses : responses[0]));
 }
 
 export async function GET() {
-  return NextResponse.json(
-    { error: "This endpoint only accepts POST (MCP Streamable HTTP, non-streaming)." },
-    { status: 405 }
+  return withCors(
+    NextResponse.json(
+      { error: "This endpoint only accepts POST (MCP Streamable HTTP, non-streaming)." },
+      { status: 405 }
+    )
   );
 }
