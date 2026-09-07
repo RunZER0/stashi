@@ -31,6 +31,7 @@ export default function DocsPage() {
             <br />
             <a href="#mcp">MCP setup</a><br />
             <a href="#mcp-remote">Remote MCP (ChatGPT)</a><br />
+            <a href="#mcp-account">Account-wide MCP</a><br />
             <a href="#query">Running a query</a><br />
             <a href="#checkpoints">Checkpoints &amp; rollback</a><br />
             <a href="#keys">Scoped agent keys</a><br />
@@ -90,6 +91,34 @@ Auth:  leave set to "No Auth" — the key in the URL is the credential`}</pre>
               from whichever key it finds (header first, then the URL) on every call, so there&rsquo;s nothing
               else to configure. Treat the key-in-URL form like any other copy of your API key: whoever has it
               can act as that database.
+            </p>
+
+            <h2 id="mcp-account">Account-wide MCP (multiple databases, one connection)</h2>
+            <p>
+              Everything above is scoped to one database — a separate connector per database, whichever
+              transport you use. An account key instead reaches every database you own through a single
+              connection. Create one from any database&rsquo;s Agent &amp; MCP tab, under &ldquo;Connect once,
+              reach every database&rdquo;:
+            </p>
+            <pre style={codeBlockStyle}>{`URL:   https://www.mystashi.online/mcp/<your account key>
+Auth:  leave set to "No Auth" in ChatGPT — same as the single-database form`}</pre>
+            <p>
+              The tool set gains a tenth tool, <code>list_databases</code> (id, name, plan, status, region for
+              everything on the account), and the other nine each take a required <code>databaseId</code>{" "}
+              argument instead of it being fixed to the connection. The usual pattern: call{" "}
+              <code>list_databases</code> once, then pass whichever id you need on every subsequent{" "}
+              <code>run_query</code>, <code>create_checkpoint</code>, etc. Same auto-checkpointing on
+              destructive statements and same audit log per database — nothing pooled or shared between them,
+              just addressed by id instead of baked into the URL.
+            </p>
+            <p>
+              Account keys carry the same full/read-only scope as per-database scoped keys, and the same
+              rule for who can create one: a full key minting another key isn&rsquo;t privilege escalation
+              (neither can exceed the account&rsquo;s own access), so an agent holding a full account key can
+              mint itself narrower keys for subagents without you in the loop. Revoking an account key cuts
+              off access to every database at once — reconnecting an existing ChatGPT/Claude connector to the
+              account-wide form means adding it as a new connector, not editing the old per-database one in
+              place.
             </p>
 
             <h2 id="query">Running a query without MCP</h2>
