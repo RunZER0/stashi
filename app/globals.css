@@ -2,8 +2,8 @@
   --ink: #f0eff2;
   --ink-2: #c4c2c9;
   --muted: #797882;
-  --paper: #080809;
-  --paper-2: #101013;
+  --paper: #262626;
+  --paper-2: #2e2e2e;
   --line: #1e1e24;
   --line-dark: #2c2c35;
   --accent: #1478fc;
@@ -143,7 +143,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .price-spec strong { font-size: 10px; text-align: right; }
 .price-link { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--line-dark); padding-top: 15px; margin-top: 13px; font-size: 11px; font-weight: 700; }
 
-.auth-page { min-height: 100vh; display: grid; place-items: center; background: #080809; }
+.auth-page { min-height: 100vh; display: grid; place-items: center; background: var(--paper); }
 .auth-shell { width: min(440px, calc(100% - 32px)); animation: fadeIn .3s cubic-bezier(0.16, 1, 0.3, 1); }
 .back-link { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; color: var(--muted); }
 .back-link:hover { color: var(--accent); }
@@ -157,7 +157,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .auth-form input:focus, .field-label input:focus { border-color: var(--accent); }
 .auth-form .button { margin-top: 4px; }
 
-.console-shell { min-height: 100vh; display: grid; grid-template-columns: 244px 1fr; background: #09090a; }
+.console-shell { min-height: 100vh; display: grid; grid-template-columns: 244px 1fr; background: var(--paper); }
 .sidebar { height: 100vh; position: sticky; top: 0; border-right: 1px solid var(--line); background: #0c0c0e; display: flex; flex-direction: column; padding: 0 12px; }
 .sidebar-brand { height: 74px; border-bottom: 1px solid var(--line); display: flex; align-items: center; padding: 0 4px; }
 .sidebar-brand .brand { font-size: 34px; }
@@ -320,7 +320,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .rotate-180 { transform: rotate(180deg); }
 .toast { position: fixed; z-index: 70; right: 22px; bottom: 22px; background: #181822; color: var(--accent); border: 1px solid #2d3045; padding: 11px 14px; display: flex; align-items: center; gap: 8px; font-size: 13px; box-shadow: var(--shadow); animation: fadeIn .2s ease; }
 
-.operator-page { min-height: 100vh; background: #080809; }
+.operator-page { min-height: 100vh; background: var(--paper); }
 .operator-header { height: 98px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
 .operator-header h1 { margin: 6px 0 0; font-size: 27px; letter-spacing: -.05em; }
 .operator-header .back-link { margin: 0; color: var(--muted); font-size: 11px; }
