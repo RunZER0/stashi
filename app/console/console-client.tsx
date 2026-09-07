@@ -787,6 +787,12 @@ function AgentPanel({
             <span className="label">REMOTE MCP (STREAMABLE HTTP)</span>
             <h3>ChatGPT &amp; other remote connectors</h3>
           </div>
+          <button
+            className="button button-dark button-compact"
+            onClick={() => copy(mcpUrlWithKey, "ChatGPT connector URL copied")}
+          >
+            <Clipboard size={14} /> Copy ChatGPT URL
+          </button>
         </div>
         <p className="panel-footnote" style={{ marginTop: 0, paddingTop: 0, borderTop: "none" }}>
           ChatGPT&apos;s connector setup only offers &ldquo;No Auth&rdquo; or OAuth &mdash; no field for a custom
@@ -796,13 +802,6 @@ function AgentPanel({
         <div className="connection-box">
           <code>{showKey ? mcpUrlWithKey : mcpUrlWithKey.replace(db.apiKey, "••••••••••••••••••••")}</code>
           <button onClick={() => setShowKey(!showKey)}>{showKey ? "Hide" : "Reveal"}</button>
-        </div>
-        <div className="credential-table">
-          <div>
-            <span>Copy URL</span>
-            <code>for ChatGPT&apos;s Connection field</code>
-            <button onClick={() => copy(mcpUrlWithKey, "MCP URL (with key) copied")}>Copy</button>
-          </div>
         </div>
         <p className="panel-footnote">
           In ChatGPT: Settings → Security and login → turn on Developer mode, then Plugins → + → paste the
