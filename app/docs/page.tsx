@@ -30,6 +30,7 @@ export default function DocsPage() {
             Docs<br />
             <br />
             <a href="#mcp">MCP setup</a><br />
+            <a href="#mcp-remote">Remote MCP (ChatGPT)</a><br />
             <a href="#query">Running a query</a><br />
             <a href="#checkpoints">Checkpoints &amp; rollback</a><br />
             <a href="#keys">Scoped agent keys</a><br />
@@ -65,6 +66,23 @@ export default function DocsPage() {
               <code>run_query</code>, <code>create_checkpoint</code>, <code>rollback_last_checkpoint</code>,{" "}
               <code>create_branch</code>, <code>create_agent_key</code>, <code>store_memory</code>, and{" "}
               <code>search_memory</code>.
+            </p>
+
+            <h2 id="mcp-remote">Remote MCP (ChatGPT and other HTTP-only clients)</h2>
+            <p>
+              The config above spawns a local process — that works for Claude Desktop, Cursor, and Windsurf,
+              but ChatGPT&rsquo;s Developer Mode connectors (and anything else that can&rsquo;t run a command on
+              your machine) need a public HTTPS endpoint instead. Same nine tools, same auth, over MCP&rsquo;s
+              Streamable HTTP transport:
+            </p>
+            <pre style={codeBlockStyle}>{`URL:   https://www.mystashi.online/api/mcp
+Auth:  Authorization: Bearer <your STASHI_API_KEY>`}</pre>
+            <p>
+              In ChatGPT: Settings → Security and login → turn on Developer mode, then Plugins → + → paste
+              that URL under Connection, and set your API key as the connector&rsquo;s auth token. The URL and
+              key are also on your console&rsquo;s Agent &amp; MCP tab, under &ldquo;ChatGPT &amp; other remote
+              connectors.&rdquo; The endpoint is stateless — it resolves which database a request is scoped to
+              from the API key on every call, so there&rsquo;s nothing to configure beyond the URL and the key.
             </p>
 
             <h2 id="query">Running a query without MCP</h2>
