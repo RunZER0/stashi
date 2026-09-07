@@ -33,6 +33,7 @@ import {
   type Checkpoint,
   type ManagedDatabase,
   type Node,
+  type AccountKey,
   type ScopedKey,
 } from "@/lib/control-plane";
 import { getPlan, plans, type PlanId } from "@/lib/plans";
@@ -813,6 +814,8 @@ function AgentPanel({
         </p>
       </section>
 
+      <AccountKeysPanel origin={origin} notify={notify} copy={copy} />
+
       {/* Autonomous Guardrails & Anti-Hallucination Controls */}
       <div className="content-grid two-one">
         <QuickCheckpoints db={db} notify={notify} />
@@ -944,6 +947,123 @@ function ScopedKeysPanel({ db, notify }: { db: ManagedDatabase; notify: (m: stri
                 {k.lastUsedAt ? ` · last used ${new Date(k.lastUsedAt).toLocaleDateString()}` : " · never used"}
               </code>
               <button onClick={() => revoke(k.id, k.label)}>Revoke</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function AccountKeysPanel({
+  origin,
+  notify,
+  copy,
+}: {
+  origin: string;
+  notify: (m: string) => void;
+  copy: (v: string, l?: string) => void;
+}) {
+  const [keys, setKeys] = useState<AccountKey[] | null>(null);
+  const [label, setLabel] = useState("");
+  const [scope, setScope] = useState<"full" | "readonly">("full");
+  const [creating, setCreating] = useState(false);
+
+  const load = async () => {
+    const res = await fetch("/api/account/keys");
+    if (!res.ok) return;
+    const payload = await res.json();
+    setKeys(payload.keys ?? []);
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const create = async () => {
+    if (!label.trim()) return;
+    setCreating(true);
+    try {
+      const res = await fetch("/api/account/keys", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ label, scope }),
+      });
+      const payload = await res.json();
+      if (!res.ok) {
+        notify(payload.error || "Could not create key");
+      } else {
+        notify(`Account key created for "${label}" — copy its URL below`);
+        setLabel("");
+        await load();
+      }
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const revoke = async (id: string, keyLabel: string) => {
+    if (!window.confirm(`Revoke the account key for "${keyLabel}"? Any agent using it loses access to every database immediately.`)) return;
+    const res = await fetch(`/api/account/keys/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      notify(`Revoked "${keyLabel}"`);
+      await load();
+    }
+  };
+
+  return (
+    <section className="data-panel">
+      <div className="panel-header">
+        <div>
+          <span className="label">ACCOUNT-WIDE MCP</span>
+          <h3>Connect once, reach every database</h3>
+        </div>
+      </div>
+      <p className="panel-footnote" style={{ marginTop: 0, paddingTop: 0, borderTop: "none" }}>
+        Everything above is scoped to this one database — a separate connector per database. An account
+        key instead reaches every database you own through one connection: the agent calls{" "}
+        <code>list_databases</code> to see what&apos;s available, then passes a <code>databaseId</code> on
+        every other call. Same tools, same checkpoint protection, per database — nothing pooled or shared
+        between them.
+      </p>
+      <div style={{ display: "flex", gap: "8px", margin: "14px 0", flexWrap: "wrap" }}>
+        <input
+          placeholder="Label, e.g. 'chatgpt' or 'research-agent'"
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          style={{ flex: 1, minWidth: "180px", minHeight: "36px", border: "1px solid var(--line-dark)", background: "#131613", padding: "0 10px", color: "var(--ink)" }}
+        />
+        <select
+          value={scope}
+          onChange={(e) => setScope(e.target.value as "full" | "readonly")}
+          style={{ minHeight: "36px", border: "1px solid var(--line-dark)", background: "#131613", color: "var(--ink)", padding: "0 8px" }}
+        >
+          <option value="full">Full access</option>
+          <option value="readonly">Read-only</option>
+        </select>
+        <button className="button button-dark button-compact" onClick={create} disabled={creating || !label.trim()}>
+          {creating ? <span className="spinner spinner-dark" /> : <Plus size={13} />}
+          Create key
+        </button>
+      </div>
+
+      {keys === null ? (
+        <div className="skeleton skeleton-row" style={{ width: "100%" }} />
+      ) : keys.length === 0 ? (
+        <p className="panel-footnote">No account keys yet — create one above to connect a single client to every database at once.</p>
+      ) : (
+        <div className="credential-table">
+          {keys.map((k) => (
+            <div key={k.id} style={{ gridTemplateColumns: "160px 1fr 150px" }}>
+              <span>{k.label}</span>
+              <code>
+                {k.scope === "readonly" ? "read-only" : "full access"}
+                {k.lastUsedAt ? ` · last used ${new Date(k.lastUsedAt).toLocaleDateString()}` : " · never used"}
+              </code>
+              <div style={{ display: "flex", gap: "10px", justifySelf: "end" }}>
+                <button onClick={() => copy(`${origin}/mcp/${k.apiKey}`, `URL for "${k.label}" copied`)}>Copy URL</button>
+                <button onClick={() => revoke(k.id, k.label)}>Revoke</button>
+              </div>
             </div>
           ))}
         </div>

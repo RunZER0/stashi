@@ -788,6 +788,78 @@ export async function resolveScopedKey(
   return { email: rows[0].owner_email, databaseId: rows[0].database_id, scope: rows[0].scope, label: rows[0].label };
 }
 
+// --- Account-wide API keys ---------------------------------------------
+// Same shape as scoped keys, but valid for every database the owner has
+// instead of one -- see the table comment in lib/db.ts for why.
+
+export type AccountKey = {
+  id: string;
+  email: string;
+  label: string;
+  apiKey: string;
+  scope: ScopedKeyScope;
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+};
+
+function rowToAccountKey(row: any): AccountKey {
+  return {
+    id: row.id,
+    email: row.owner_email,
+    label: row.label,
+    apiKey: row.api_key,
+    scope: row.scope,
+    createdAt: row.created_at.toISOString(),
+    lastUsedAt: row.last_used_at ? row.last_used_at.toISOString() : null,
+    revokedAt: row.revoked_at ? row.revoked_at.toISOString() : null,
+  };
+}
+
+export async function listAccountKeys(email: string): Promise<AccountKey[]> {
+  await ensureSchema();
+  const { rows } = await getPool().query(
+    `SELECT * FROM account_keys WHERE owner_email = $1 AND revoked_at IS NULL ORDER BY created_at DESC`,
+    [email]
+  );
+  return rows.map(rowToAccountKey);
+}
+
+export async function createAccountKey(email: string, label: string, scope: ScopedKeyScope): Promise<AccountKey> {
+  await ensureSchema();
+  const id = newId("acctkey");
+  const apiKey = `st_acct_${scope === "readonly" ? "ro" : "live"}_${randomBytes(9).toString("hex")}`;
+  const { rows } = await getPool().query(
+    `INSERT INTO account_keys (id, owner_email, label, api_key, scope) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+    [id, email, label.trim() || "Unlabeled agent", apiKey, scope]
+  );
+  await pushActivity(email, "you", "account_key.created", `${label} (${scope}, all databases)`);
+  return rowToAccountKey(rows[0]);
+}
+
+export async function revokeAccountKey(email: string, keyId: string): Promise<void> {
+  await ensureSchema();
+  const { rows } = await getPool().query(
+    `UPDATE account_keys SET revoked_at = now() WHERE id = $1 AND owner_email = $2 AND revoked_at IS NULL RETURNING label`,
+    [keyId, email]
+  );
+  if (rows[0]) await pushActivity(email, "you", "account_key.revoked", `${rows[0].label} (all databases)`);
+}
+
+// Resolves a Bearer token against account_keys -- checked when it matches
+// neither a database's primary api_key nor a scoped key (see lib/auth.ts).
+export async function resolveAccountKey(
+  apiKey: string
+): Promise<{ email: string; scope: ScopedKeyScope; label: string } | null> {
+  await ensureSchema();
+  const { rows } = await getPool().query(
+    `UPDATE account_keys SET last_used_at = now() WHERE api_key = $1 AND revoked_at IS NULL RETURNING owner_email, scope, label`,
+    [apiKey]
+  );
+  if (!rows[0]) return null;
+  return { email: rows[0].owner_email, scope: rows[0].scope, label: rows[0].label };
+}
+
 export async function adminSummary() {
   await ensureSchema();
   const pool = getPool();

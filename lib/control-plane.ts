@@ -44,6 +44,17 @@ export type ScopedKey = {
   revokedAt: string | null;
 };
 
+export type AccountKey = {
+  id: string;
+  email: string;
+  label: string;
+  apiKey: string;
+  scope: ScopedKeyScope;
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+};
+
 export type CheckpointKind = "checkpoint" | "backup" | "auto";
 export type CheckpointStatus = "pending" | "ready" | "failed" | "restoring";
 

@@ -134,6 +134,26 @@ export async function ensureSchema() {
     CREATE INDEX IF NOT EXISTS scoped_keys_database_idx ON scoped_keys(database_id);
     CREATE INDEX IF NOT EXISTS scoped_keys_lookup_idx ON scoped_keys(api_key) WHERE revoked_at IS NULL;
 
+    -- Account-wide keys: same idea as scoped_keys, but not tied to one
+    -- database_id -- valid for every database the owner has, present or
+    -- future. Lets one MCP connection (one URL) reach all of an account's
+    -- databases instead of needing a separate connector per database. Full
+    -- scope on an account key still can't do anything a full per-database
+    -- key couldn't already do to that same database; the only thing it
+    -- adds is not having to pick which database ahead of time.
+    CREATE TABLE IF NOT EXISTS account_keys (
+      id text PRIMARY KEY,
+      owner_email text NOT NULL REFERENCES users(email),
+      label text NOT NULL,
+      api_key text NOT NULL UNIQUE,
+      scope text NOT NULL DEFAULT 'full',
+      created_at timestamptz NOT NULL DEFAULT now(),
+      last_used_at timestamptz,
+      revoked_at timestamptz
+    );
+    CREATE INDEX IF NOT EXISTS account_keys_owner_idx ON account_keys(owner_email);
+    CREATE INDEX IF NOT EXISTS account_keys_lookup_idx ON account_keys(api_key) WHERE revoked_at IS NULL;
+
     INSERT INTO nodes (id, label, region, capacity_status)
     VALUES ('node-nj-01', 'NJ · 01', 'New Jersey, US', 'pending')
     ON CONFLICT (id) DO NOTHING;

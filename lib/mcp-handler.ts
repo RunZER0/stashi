@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
 import { resolveAccessByApiKey } from "@/lib/auth";
-import { registerStashiTools } from "@/lib/mcp-tools";
+import { registerAccountTools, registerDatabaseTools } from "@/lib/mcp-tools";
 
 // Shared implementation behind both MCP routes:
 //   app/mcp/route.ts            -- Authorization: Bearer <key> header
@@ -118,7 +118,11 @@ export async function mcpPost(request: Request, pathApiKey: string | null): Prom
     { name: "stashi", version: "0.1.0" },
     { capabilities: { tools: {} } }
   );
-  registerStashiTools(server, { origin, apiKey, databaseId: access.databaseId });
+  if (access.kind === "account") {
+    registerAccountTools(server, { origin, apiKey });
+  } else {
+    registerDatabaseTools(server, { origin, apiKey, databaseId: access.databaseId });
+  }
 
   const transport = new OneShotTransport();
   await server.connect(transport as never);
