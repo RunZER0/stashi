@@ -731,7 +731,6 @@ function AgentPanel({
   copy: (v: string, l?: string) => void;
   notify: (m: string) => void;
 }) {
-  const [showKey, setShowKey] = useState(false);
   const mcpConfig = JSON.stringify(
     {
       mcpServers: {
@@ -785,29 +784,32 @@ function AgentPanel({
         <div className="panel-header">
           <div>
             <span className="label">REMOTE MCP (STREAMABLE HTTP)</span>
-            <h3>ChatGPT &amp; other remote connectors</h3>
+            <h3>ChatGPT, Claude, &amp; any other remote connector</h3>
           </div>
           <button
             className="button button-dark button-compact"
-            onClick={() => copy(mcpUrlWithKey, "ChatGPT connector URL copied")}
+            onClick={() => copy(mcpUrlWithKey, "Remote MCP URL copied")}
           >
-            <Clipboard size={14} /> Copy ChatGPT URL
+            <Clipboard size={14} /> Copy remote MCP URL
           </button>
         </div>
         <p className="panel-footnote" style={{ marginTop: 0, paddingTop: 0, borderTop: "none" }}>
-          ChatGPT&apos;s connector setup only offers &ldquo;No Auth&rdquo; or OAuth &mdash; no field for a custom
-          header. This URL carries your key itself, the same way a webhook secret would, so &ldquo;No Auth&rdquo;
-          still works. Treat it like the key it contains: anyone with this URL can act as this database.
+          One URL, works the same for any client that supports a remote MCP connector — not specific to
+          ChatGPT. It carries your key itself, the same way a webhook secret would, so it works even where
+          the only auth choice is &ldquo;No Auth&rdquo; (ChatGPT&apos;s connector dialog, as of this writing).
+          Treat it like the key it contains: anyone with this URL can act as this database.
         </p>
         <div className="connection-box">
-          <code>{showKey ? mcpUrlWithKey : mcpUrlWithKey.replace(db.apiKey, "••••••••••••••••••••")}</code>
-          <button onClick={() => setShowKey(!showKey)}>{showKey ? "Hide" : "Reveal"}</button>
+          <code>{mcpUrlWithKey}</code>
+          <button onClick={() => copy(mcpUrlWithKey, "Remote MCP URL copied")}>
+            <Clipboard size={14} /> Copy
+          </button>
         </div>
         <p className="panel-footnote">
           In ChatGPT: Settings → Security and login → turn on Developer mode, then Plugins → + → paste the
-          URL above under Connection, leave Authentication set to &ldquo;No Auth,&rdquo; and create. For clients
-          that <em>do</em> support a custom header instead, use <code>{mcpUrl}</code> with{" "}
-          <code>Authorization: Bearer {"<your API key>"}</code>.
+          URL above under Connection, leave Authentication set to &ldquo;No Auth,&rdquo; and create. In Claude
+          or any client that takes a custom header instead, use <code>{mcpUrl}</code> with{" "}
+          <code>Authorization: Bearer {"<your API key>"}</code> — either form reaches the same database.
         </p>
       </section>
 
