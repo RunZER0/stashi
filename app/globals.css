@@ -158,7 +158,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .auth-form .button { margin-top: 4px; }
 
 .console-shell { min-height: 100vh; display: grid; grid-template-columns: 244px 1fr; background: var(--paper); }
-.sidebar { height: 100vh; position: sticky; top: 0; border-right: 1px solid var(--line); background: #0c0c0e; display: flex; flex-direction: column; padding: 0 12px; }
+.sidebar { height: 100vh; position: sticky; top: 0; border-right: 1px solid var(--line); background: var(--paper); display: flex; flex-direction: column; padding: 0 12px; }
 .sidebar-brand { height: 74px; border-bottom: 1px solid var(--line); display: flex; align-items: center; padding: 0 4px; }
 .sidebar-brand .brand { font-size: 34px; }
 .workspace-switcher-wrap { position: relative; margin: 12px 0; }
@@ -201,7 +201,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .quick-menu-anchor { position: relative; }
 .quick-menu form { width: 100%; }
 .console-main { min-width: 0; }
-.console-topbar { height: 57px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; background: rgba(9, 9, 10,.85); backdrop-filter: blur(12px); position: sticky; top: 0; z-index: 5; }
+.console-topbar { height: 57px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; background: rgba(38, 38, 38, .85); backdrop-filter: blur(12px); position: sticky; top: 0; z-index: 5; }
 .breadcrumb { display: flex; gap: 7px; align-items: center; font-size: 13px; }
 .breadcrumb span { color: var(--muted); }
 .console-actions { display: flex; gap: 7px; align-items: center; }
