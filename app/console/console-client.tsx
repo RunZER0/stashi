@@ -41,6 +41,7 @@ import { SqlEditor } from "./sql-editor";
 import { CheckpointsPanel } from "./checkpoints-panel";
 
 type Tab = "overview" | "sql" | "connection" | "agent" | "metrics" | "activity" | "backups" | "settings";
+type View = "database" | "account";
 
 const TRANSIENT_STATUSES = new Set(["provisioning", "resizing"]);
 
@@ -64,6 +65,7 @@ export default function ConsoleClient({
   const [databases, setDatabases] = useState(initialDatabases);
   const [activity, setActivity] = useState(initialActivity);
   const [activeId, setActiveId] = useState<string | null>(initialDatabases[0]?.id ?? null);
+  const [view, setView] = useState<View>("database");
   const [tab, setTab] = useState<Tab>("overview");
   const [createOpen, setCreateOpen] = useState(false);
   const [showSecret, setShowSecret] = useState(false);
@@ -81,6 +83,7 @@ export default function ConsoleClient({
   const db = useMemo(() => databases.find((item) => item.id === activeId) ?? null, [databases, activeId]);
   const plan = db ? getPlan(db.plan) : null;
   const connectionString = db ? makeConnectionString(db) : "";
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://www.mystashi.online";
 
   const notify = (message: string) => {
     setToast(message);
@@ -250,13 +253,25 @@ export default function ConsoleClient({
           )}
         </div>
         <nav className="side-nav">
-          <button className={tab === "overview" ? "side-nav-active" : undefined} onClick={() => setTab("overview")}>
+          <button
+            className={view === "database" ? "side-nav-active" : undefined}
+            onClick={() => {
+              setView("database");
+              setTab("overview");
+            }}
+          >
             <Database size={15} /> Databases <span>{databases.length}</span>
           </button>
-          <button className={tab === "agent" ? "side-nav-active" : undefined} onClick={() => setTab("agent")} disabled={!db}>
+          <button className={view === "account" ? "side-nav-active" : undefined} onClick={() => setView("account")}>
             <Cpu size={15} /> Agent &amp; MCP
           </button>
-          <button className={tab === "activity" ? "side-nav-active" : undefined} onClick={() => setTab("activity")}>
+          <button
+            className={view === "database" && tab === "activity" ? "side-nav-active" : undefined}
+            onClick={() => {
+              setView("database");
+              setTab("activity");
+            }}
+          >
             <Activity size={15} /> Activity
           </button>
           <Link href="/admin">
@@ -268,9 +283,10 @@ export default function ConsoleClient({
           {databases.map((item) => (
             <button
               key={item.id}
-              className={item.id === db?.id ? "db-list-active" : ""}
+              className={view === "database" && item.id === db?.id ? "db-list-active" : ""}
               onClick={() => {
                 setActiveId(item.id);
+                setView("database");
                 setTab("overview");
               }}
             >
@@ -297,18 +313,28 @@ export default function ConsoleClient({
       <section className="console-main">
         <header className="console-topbar">
           <div className="breadcrumb">
-            <span>Databases</span>
-            <span>/</span>
-            <strong>{db ? db.name : "—"}</strong>
+            {view === "account" ? (
+              <>
+                <span>Account</span>
+                <span>/</span>
+                <strong>Agent &amp; MCP</strong>
+              </>
+            ) : (
+              <>
+                <span>Databases</span>
+                <span>/</span>
+                <strong>{db ? db.name : "—"}</strong>
+              </>
+            )}
           </div>
           <div className="console-actions">
-            {db && (
+            {view === "database" && db && (
               <span className={`status-pill status-${db.status}`}>
                 <span className={`db-led ${db.status}`} />
                 {db.status.toUpperCase()}
               </span>
             )}
-            {db && (
+            {view === "database" && db && (
               <div className="quick-menu-anchor">
                 <button
                   className="icon-button"
@@ -371,7 +397,9 @@ export default function ConsoleClient({
         </header>
 
         <div className="console-content">
-          {!db ? (
+          {view === "account" ? (
+            <AccountAgentView origin={origin} notify={notify} copy={copy} />
+          ) : !db ? (
             <EmptyState onCreate={() => setCreateOpen(true)} />
           ) : (
             <>
@@ -450,7 +478,7 @@ export default function ConsoleClient({
                 />
               )}
               {tab === "agent" && (
-                <AgentPanel db={db} plan={plan!} connectionString={connectionString} copy={copy} notify={notify} />
+                <AgentPanel db={db} plan={plan!} connectionString={connectionString} origin={origin} copy={copy} notify={notify} />
               )}
               {tab === "metrics" && <Metrics db={db} />}
               {tab === "activity" && <ActivityPanel activity={activity} />}
@@ -723,15 +751,19 @@ function AgentPanel({
   db,
   plan,
   connectionString,
+  origin,
   copy,
   notify,
 }: {
   db: ManagedDatabase;
   plan: ReturnType<typeof getPlan>;
   connectionString: string;
+  origin: string;
   copy: (v: string, l?: string) => void;
   notify: (m: string) => void;
 }) {
+  const [connectMode, setConnectMode] = useState<"local" | "remote">("local");
+
   const mcpConfig = JSON.stringify(
     {
       mcpServers: {
@@ -741,7 +773,7 @@ function AgentPanel({
           env: {
             STASHI_API_KEY: db.apiKey,
             STASHI_DATABASE_ID: db.id,
-            STASHI_API_URL: typeof window !== "undefined" ? window.location.origin : "https://www.mystashi.online",
+            STASHI_API_URL: origin,
             DATABASE_URL: connectionString,
           },
         },
@@ -751,70 +783,68 @@ function AgentPanel({
     2
   );
 
-  const origin = typeof window !== "undefined" ? window.location.origin : "https://www.mystashi.online";
   const mcpUrl = `${origin}/mcp`;
   const mcpUrlWithKey = `${origin}/mcp/${db.apiKey}`;
 
   return (
     <div className="panel-stack">
-      {/* MCP Quick Connect */}
+      {/* Connect this database to an AI client — one panel, pick the transport your client needs */}
       <section className="data-panel">
         <div className="panel-header">
           <div>
             <span className="label">MODEL CONTEXT PROTOCOL (MCP)</span>
-            <h3>Claude Desktop, Cursor, &amp; Antigravity Config</h3>
+            <h3>Connect an AI client to {db.name}</h3>
           </div>
           <button
             className="button button-dark button-compact"
-            onClick={() => copy(mcpConfig, "MCP Configuration copied to clipboard")}
+            onClick={() =>
+              connectMode === "local"
+                ? copy(mcpConfig, "MCP config copied")
+                : copy(mcpUrlWithKey, "Remote MCP URL copied")
+            }
           >
-            <Clipboard size={14} /> Copy MCP Config
+            <Clipboard size={14} /> {connectMode === "local" ? "Copy config" : "Copy URL"}
           </button>
         </div>
-        <div className="big-code" style={{ padding: "18px", borderRadius: "0" }}>
-          <Cpu size={16} />
-          <pre style={{ margin: 0, fontSize: "11px", color: "#a5caa9", overflowX: "auto" }}>{mcpConfig}</pre>
+        <div className="tabs" role="tablist" style={{ marginTop: 0 }}>
+          <button className={connectMode === "local" ? "tab-active" : ""} onClick={() => setConnectMode("local")}>
+            Local (Claude Desktop, Cursor, Windsurf)
+          </button>
+          <button className={connectMode === "remote" ? "tab-active" : ""} onClick={() => setConnectMode("remote")}>
+            Remote URL (ChatGPT &amp; others)
+          </button>
         </div>
-        <p className="panel-footnote">
-          Paste into your <code>claude_desktop_config.json</code> or Cursor / Windsurf settings. Allows your AI assistant to read schemas, run safe parameterized queries, and branch tables.
-        </p>
-      </section>
 
-      {/* Remote MCP endpoint — for clients that can't spawn a local process */}
-      <section className="data-panel">
-        <div className="panel-header">
-          <div>
-            <span className="label">REMOTE MCP (STREAMABLE HTTP)</span>
-            <h3>ChatGPT, Claude, &amp; any other remote connector</h3>
-          </div>
-          <button
-            className="button button-dark button-compact"
-            onClick={() => copy(mcpUrlWithKey, "Remote MCP URL copied")}
-          >
-            <Clipboard size={14} /> Copy remote MCP URL
-          </button>
-        </div>
-        <p className="panel-footnote" style={{ marginTop: 0, paddingTop: 0, borderTop: "none" }}>
-          One URL, works the same for any client that supports a remote MCP connector — not specific to
-          ChatGPT. It carries your key itself, the same way a webhook secret would, so it works even where
-          the only auth choice is &ldquo;No Auth&rdquo; (ChatGPT&apos;s connector dialog, as of this writing).
-          Treat it like the key it contains: anyone with this URL can act as this database.
-        </p>
-        <div className="connection-box">
-          <code>{mcpUrlWithKey}</code>
-          <button onClick={() => copy(mcpUrlWithKey, "Remote MCP URL copied")}>
-            <Clipboard size={14} /> Copy
-          </button>
-        </div>
-        <p className="panel-footnote">
-          In ChatGPT: Settings → Security and login → turn on Developer mode, then Plugins → + → paste the
-          URL above under Connection, leave Authentication set to &ldquo;No Auth,&rdquo; and create. In Claude
-          or any client that takes a custom header instead, use <code>{mcpUrl}</code> with{" "}
-          <code>Authorization: Bearer {"<your API key>"}</code> — either form reaches the same database.
-        </p>
+        {connectMode === "local" ? (
+          <>
+            <div className="big-code" style={{ padding: "18px", borderRadius: "0", marginTop: "16px" }}>
+              <Cpu size={16} />
+              <pre style={{ margin: 0, fontSize: "11px", color: "#a5caa9", overflowX: "auto" }}>{mcpConfig}</pre>
+            </div>
+            <p className="panel-footnote">
+              Paste into your <code>claude_desktop_config.json</code> or Cursor / Windsurf settings. Spawns a
+              local process — only works for clients that can run a command on your machine.
+            </p>
+          </>
+        ) : (
+          <>
+            <div className="connection-box" style={{ marginTop: "16px" }}>
+              <code>{mcpUrlWithKey}</code>
+              <button onClick={() => copy(mcpUrlWithKey, "Remote MCP URL copied")}>
+                <Clipboard size={14} /> Copy
+              </button>
+            </div>
+            <p className="panel-footnote">
+              In ChatGPT: Settings → Security and login → turn on Developer mode, then Plugins → + → paste
+              this URL under Connection, leave Authentication on &ldquo;No Auth,&rdquo; and create — it carries
+              your key itself, the same way a webhook secret would. In Claude or any client that takes a
+              custom header instead, use <code>{mcpUrl}</code> with{" "}
+              <code>Authorization: Bearer {"<your API key>"}</code>. Either form reaches this same database;
+              treat both like the key they contain.
+            </p>
+          </>
+        )}
       </section>
-
-      <AccountKeysPanel origin={origin} notify={notify} copy={copy} />
 
       {/* Autonomous Guardrails & Anti-Hallucination Controls */}
       <div className="content-grid two-one">
@@ -955,6 +985,34 @@ function ScopedKeysPanel({ db, notify }: { db: ManagedDatabase; notify: (m: stri
   );
 }
 
+// Account-level view, reached from the sidebar's own "Agent & MCP" nav item
+// — deliberately not nested inside any single database's tabs, since an
+// account key isn't a property of one database. Lives at the same level as
+// "Databases", not underneath it.
+function AccountAgentView({
+  origin,
+  notify,
+  copy,
+}: {
+  origin: string;
+  notify: (m: string) => void;
+  copy: (v: string, l?: string) => void;
+}) {
+  return (
+    <>
+      <div className="database-heading">
+        <div>
+          <h1>Agent &amp; MCP</h1>
+          <p>Account-wide — applies across every database you own, not just one.</p>
+        </div>
+      </div>
+      <div className="panel-stack">
+        <AccountKeysPanel origin={origin} notify={notify} copy={copy} />
+      </div>
+    </>
+  );
+}
+
 function AccountKeysPanel({
   origin,
   notify,
@@ -1020,11 +1078,11 @@ function AccountKeysPanel({
         </div>
       </div>
       <p className="panel-footnote" style={{ marginTop: 0, paddingTop: 0, borderTop: "none" }}>
-        Everything above is scoped to this one database — a separate connector per database. An account
-        key instead reaches every database you own through one connection: the agent calls{" "}
-        <code>list_databases</code> to see what&apos;s available, then passes a <code>databaseId</code> on
-        every other call. Same tools, same checkpoint protection, per database — nothing pooled or shared
-        between them.
+        One key, every database — the agent calls <code>list_databases</code> to see what&apos;s available,
+        then passes a <code>databaseId</code> on every other call. Same tools, same checkpoint protection,
+        per database — nothing pooled or shared between them. If you only need one specific database, use
+        that database&apos;s own Agent &amp; MCP tab instead — a per-database key stays simpler to reason
+        about and to revoke.
       </p>
       <div style={{ display: "flex", gap: "8px", margin: "14px 0", flexWrap: "wrap" }}>
         <input
