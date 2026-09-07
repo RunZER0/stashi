@@ -263,7 +263,7 @@ export default function ConsoleClient({
             <Database size={15} /> Databases <span>{databases.length}</span>
           </button>
           <button className={view === "account" ? "side-nav-active" : undefined} onClick={() => setView("account")}>
-            <Cpu size={15} /> Agent &amp; MCP
+            <SlidersHorizontal size={15} /> Account Settings
           </button>
           <button
             className={view === "database" && tab === "activity" ? "side-nav-active" : undefined}
@@ -317,7 +317,7 @@ export default function ConsoleClient({
               <>
                 <span>Account</span>
                 <span>/</span>
-                <strong>Agent &amp; MCP</strong>
+                <strong>Settings</strong>
               </>
             ) : (
               <>
@@ -398,7 +398,7 @@ export default function ConsoleClient({
 
         <div className="console-content">
           {view === "account" ? (
-            <AccountAgentView origin={origin} notify={notify} copy={copy} />
+            <AccountSettingsView origin={origin} notify={notify} copy={copy} />
           ) : !db ? (
             <EmptyState onCreate={() => setCreateOpen(true)} />
           ) : (
@@ -985,11 +985,12 @@ function ScopedKeysPanel({ db, notify }: { db: ManagedDatabase; notify: (m: stri
   );
 }
 
-// Account-level view, reached from the sidebar's own "Agent & MCP" nav item
-// — deliberately not nested inside any single database's tabs, since an
-// account key isn't a property of one database. Lives at the same level as
-// "Databases", not underneath it.
-function AccountAgentView({
+// Account-level view, reached from the sidebar's own "Account Settings" nav
+// item — deliberately not nested inside any single database's tabs, since
+// an account key isn't a property of one database. Lives at the same level
+// as "Databases", not underneath it. Just account-wide MCP keys for now;
+// this is the natural home for other account-level settings later too.
+function AccountSettingsView({
   origin,
   notify,
   copy,
@@ -1002,8 +1003,8 @@ function AccountAgentView({
     <>
       <div className="database-heading">
         <div>
-          <h1>Agent &amp; MCP</h1>
-          <p>Account-wide — applies across every database you own, not just one.</p>
+          <h1>Account Settings</h1>
+          <p>Applies across every database you own, not just one.</p>
         </div>
       </div>
       <div className="panel-stack">
