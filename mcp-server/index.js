@@ -275,7 +275,7 @@ server.registerTool(
     inputSchema: {
       content: z.string().describe("The text being remembered"),
       embedding: z.array(z.number()).describe("The embedding vector for `content`, as a plain array of numbers"),
-      metadata: z.record(z.any()).optional().describe("Optional JSON metadata (source, tags, timestamp, etc.)"),
+      metadata: z.record(z.string(), z.any()).optional().describe("Optional JSON metadata (source, tags, timestamp, etc.)"),
     },
   },
   async ({ content, embedding, metadata }) => {

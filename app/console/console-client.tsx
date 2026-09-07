@@ -731,6 +731,7 @@ function AgentPanel({
   copy: (v: string, l?: string) => void;
   notify: (m: string) => void;
 }) {
+  const [showKey, setShowKey] = useState(false);
   const mcpConfig = JSON.stringify(
     {
       mcpServers: {
@@ -749,6 +750,8 @@ function AgentPanel({
     null,
     2
   );
+
+  const mcpUrl = `${typeof window !== "undefined" ? window.location.origin : "https://www.mystashi.online"}/api/mcp`;
 
   return (
     <div className="panel-stack">
@@ -772,6 +775,34 @@ function AgentPanel({
         </div>
         <p className="panel-footnote">
           Paste into your <code>claude_desktop_config.json</code> or Cursor / Windsurf settings. Allows your AI assistant to read schemas, run safe parameterized queries, and branch tables.
+        </p>
+      </section>
+
+      {/* Remote MCP endpoint — for clients that can't spawn a local process */}
+      <section className="data-panel">
+        <div className="panel-header">
+          <div>
+            <span className="label">REMOTE MCP (STREAMABLE HTTP)</span>
+            <h3>ChatGPT &amp; other remote connectors</h3>
+          </div>
+        </div>
+        <div className="connection-box">
+          <code>{mcpUrl}</code>
+          <button onClick={() => copy(mcpUrl, "MCP server URL copied")}>
+            <Clipboard size={14} /> Copy
+          </button>
+        </div>
+        <div className="credential-table">
+          <div>
+            <span>Auth</span>
+            <code>Bearer {showKey ? db.apiKey : "••••••••••••••••••••"}</code>
+            <button onClick={() => setShowKey(!showKey)}>{showKey ? "Hide" : "Reveal"}</button>
+          </div>
+        </div>
+        <p className="panel-footnote">
+          In ChatGPT: Settings → Security and login → turn on Developer mode, then Plugins → + →
+          paste this URL under Connection, and set the API key above as the connector&apos;s auth token. Same tools
+          as the config above, over HTTP instead of a local process.
         </p>
       </section>
 
