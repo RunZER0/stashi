@@ -105,7 +105,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="mk-wrap" style={{ padding: "0 0 100px", position: "relative", zIndex: 2 }}>
+      <section className="mk-wrap" style={{ padding: "0 0 28px", position: "relative", zIndex: 2 }}>
         <div className={styles.docsPointer}>
           <div><h3>Ready to inspect the machinery?</h3><p>Read the connection guides, MCP setup, API examples, and exactly how Stashi handles checkpoints.</p></div>
           <Link className="mk-button mk-button-quiet" href="/docs">Read the docs <ArrowRight size={15} /></Link>

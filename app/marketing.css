@@ -473,9 +473,10 @@
   color: #f5f4f6;
 }
 .mk-footer {
-  border-top: 1px solid #1e1e24;
+  border-top: 1px solid rgba(86, 160, 255, .38);
   padding: 48px 0 54px;
-  background: #060607;
+  background: linear-gradient(105deg, #070b12 0%, #060607 52%, #090c13 100%);
+  box-shadow: inset 0 1px 0 rgba(165, 208, 255, .06);
 }
 .mk-footer-inner {
   display: flex;
@@ -485,7 +486,7 @@
 }
 .mk-footer p {
   font-size: 13px;
-  color: #797883;
+  color: #98a7bc;
   margin: 12px 0 0;
   max-width: 480px;
   line-height: 1.6;
@@ -494,7 +495,7 @@
   display: flex;
   gap: 22px;
   font-size: 13px;
-  color: #8f8e98;
+  color: #aab7c9;
 }
 .mk-pricing {
   padding: 64px 0 110px;
