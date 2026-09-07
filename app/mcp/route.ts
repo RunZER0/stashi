@@ -8,8 +8,10 @@ import { registerStashiTools } from "@/lib/mcp-tools";
 // Claude Desktop/Cursor/Windsurf do -- ChatGPT's Developer Mode connectors
 // chief among them, which require a public HTTPS URL speaking MCP's
 // Streamable HTTP transport rather than a `command`/`args` stdio config.
-// Same tools as mcp-server/index.js (the published stdio package), same
-// underlying REST API, different transport.
+// Lives at the top-level /mcp path (not nested under /api) to match what
+// MCP clients conventionally expect and what ChatGPT's connector setup
+// asks for. Same tools as mcp-server/index.js (the published stdio
+// package), same underlying REST API, different transport.
 //
 // Stateless by design: every request carries its own Bearer STASHI_API_KEY
 // (or scoped key), which is resolved to a database fresh on every call --

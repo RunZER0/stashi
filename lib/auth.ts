@@ -38,7 +38,7 @@ export async function resolveDatabaseAccess(
 
 // Same two API-key paths as resolveDatabaseAccess, but for callers that
 // don't already know which database a key belongs to — the remote MCP
-// endpoint (app/api/mcp/route.ts), which is one shared URL for every
+// endpoint (app/mcp/route.ts), which is one shared URL for every
 // database rather than a per-database path. Session cookies aren't accepted
 // here: that endpoint is meant for external tool clients (ChatGPT, etc.)
 // presenting a Stashi API key, not a logged-in browser tab.

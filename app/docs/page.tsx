@@ -75,7 +75,7 @@ export default function DocsPage() {
               your machine) need a public HTTPS endpoint instead. Same nine tools, same auth, over MCP&rsquo;s
               Streamable HTTP transport:
             </p>
-            <pre style={codeBlockStyle}>{`URL:   https://www.mystashi.online/api/mcp
+            <pre style={codeBlockStyle}>{`URL:   https://www.mystashi.online/mcp
 Auth:  Authorization: Bearer <your STASHI_API_KEY>`}</pre>
             <p>
               In ChatGPT: Settings → Security and login → turn on Developer mode, then Plugins → + → paste

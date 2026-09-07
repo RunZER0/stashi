@@ -3,7 +3,7 @@ import { z } from "zod";
 
 // Registers the same tool set as mcp-server/index.js (the local stdio
 // package for Claude Desktop/Cursor/Windsurf), adapted for the remote HTTP
-// endpoint at app/api/mcp/route.ts: instead of a fixed DATABASE_ID/API_URL
+// endpoint at app/mcp/route.ts: instead of a fixed DATABASE_ID/API_URL
 // read from process.env once at process start, every value here comes from
 // the single request that's being served, since a stateless HTTP handler
 // has no long-lived process to hold them in. Keep the tool set and

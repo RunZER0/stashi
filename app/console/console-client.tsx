@@ -751,7 +751,7 @@ function AgentPanel({
     2
   );
 
-  const mcpUrl = `${typeof window !== "undefined" ? window.location.origin : "https://www.mystashi.online"}/api/mcp`;
+  const mcpUrl = `${typeof window !== "undefined" ? window.location.origin : "https://www.mystashi.online"}/mcp`;
 
   return (
     <div className="panel-stack">
