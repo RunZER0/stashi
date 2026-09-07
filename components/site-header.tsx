@@ -8,7 +8,6 @@ export function SiteHeader() {
         <img src="/stashi-logo-light.png" alt="Stashi" height={40} style={{ height: "40px", width: "auto", display: "block" }} />
       </Link>
       <nav className="mk-nav" aria-label="Primary navigation">
-        <Link href="/#control">Control model</Link>
         <Link href="/pricing">Pricing</Link>
         <Link href="/docs">Docs</Link>
         <Link href="/about">About</Link>

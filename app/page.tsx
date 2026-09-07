@@ -34,7 +34,7 @@ export default function Home() {
           <p>Stashi is the clear, dependable Postgres foundation for applications, teams, and automated workflows—with fixed plans, scoped keys, audit visibility, and recovery built in.</p>
           <div className={styles.actions}>
             <Link className="mk-button mk-button-dark" href="/login">Start with Stashi <ArrowRight size={16} /></Link>
-            <Link className="mk-button mk-button-quiet" href="#control">Explore the control model</Link>
+            <Link className="mk-button mk-button-quiet" href="#how-it-works">See how it works</Link>
           </div>
           <div className={styles.heroFacts}>
             <span><ShieldCheck size={14} /> Scoped credentials</span>
@@ -44,10 +44,10 @@ export default function Home() {
         <HeroVisual />
       </section>
 
-      <section id="control" className={styles.controlSection} style={{ position: "relative", zIndex: 2 }}>
+      <section className={styles.controlSection} style={{ position: "relative", zIndex: 2 }}>
         <div className="mk-wrap">
           <div className={styles.sectionIntro}>
-            <span className={styles.kicker}>The control model</span>
+            <span className={styles.kicker}>Built for real work</span>
             <h2>Your database should make growth feel less fragile.</h2>
             <p>Stashi turns the moments that typically create uncertainty—new releases, growing traffic, evolving access—into clear, recoverable states.</p>
           </div>

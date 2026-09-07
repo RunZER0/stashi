@@ -434,23 +434,46 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 24px;
-  padding: 36px 40px;
-  border: 1px solid #1e1e24;
-  background: rgba(12, 12, 14, .5);
+  padding: 42px 44px;
+  border: 1px solid rgba(86, 160, 255, .48);
+  border-left: 4px solid #1478fc;
+  background: linear-gradient(105deg, rgba(14, 47, 86, .88), rgba(13, 16, 25, .94) 56%, rgba(11, 11, 14, .94));
+  box-shadow: 0 22px 56px rgba(0, 0, 0, .38), inset 0 1px 0 rgba(151, 201, 255, .12);
+  position: relative;
+  overflow: hidden;
+}
+
+.docsPointer::after {
+  content: "";
+  position: absolute;
+  width: 360px;
+  height: 360px;
+  right: -120px;
+  top: -235px;
+  border: 1px solid rgba(86, 160, 255, .22);
+  border-radius: 50%;
+  box-shadow: 0 0 0 42px rgba(86, 160, 255, .035), 0 0 0 84px rgba(86, 160, 255, .025);
+  pointer-events: none;
 }
 
 .docsPointer h3 {
+  position: relative;
+  z-index: 1;
   margin: 0 0 6px;
   font-size: 19px;
   color: #f5f4f6;
 }
 
 .docsPointer p {
+  position: relative;
+  z-index: 1;
   margin: 0;
   color: #8f8e98;
   font-size: 13px;
   max-width: 480px;
 }
+
+.docsPointer .mk-button { position: relative; z-index: 1; }
 
 /* ---------- /pricing page ---------- */
 
@@ -616,6 +639,7 @@
   .docsPointer {
     flex-direction: column;
     align-items: flex-start;
+    padding: 32px 30px;
   }
 
   .priceSection {
