@@ -12,10 +12,10 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 
 export const metadata: Metadata = {
   title: {
-    default: "Stashi — Low-cost, agentic-tuned PostgreSQL from $1/month",
+    default: "Stashi — Managed PostgreSQL with fixed plans from $2/month",
     template: "%s — Stashi",
   },
-  description: "Low-cost, agentic-tuned managed PostgreSQL with TLS, PgBouncer pooling, MCP support, and fixed monthly plans from $1/month.",
+  description: "Managed PostgreSQL with TLS, PgBouncer pooling, MCP support, and fixed monthly plans from $2/month.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {

@@ -16,7 +16,7 @@ export const plans: Plan[] = [
   {
     id: "dev",
     name: "Dev",
-    price: 1,
+    price: 2,
     tagline: "Personal projects, test environments and prototypes.",
     storageGb: 1,
     connections: 10,

@@ -8,7 +8,7 @@ export function SiteFooter() {
           <Link className="mk-brand" href="/" aria-label="Stashi home">
             <img src="/stashi-logo-light.png" alt="Stashi" height={36} style={{ height: "36px", width: "auto", display: "block" }} />
           </Link>
-          <p>Low-cost, agentic-tuned managed PostgreSQL with fixed monthly pricing from $1 a month.</p>
+          <p>Managed PostgreSQL for applications, teams, and automated workflows, with fixed monthly pricing from $2 a month.</p>
         </div>
         <div className="mk-footer-links">
           <Link href="/#how-it-works">How it works</Link>

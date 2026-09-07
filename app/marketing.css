@@ -22,7 +22,7 @@
   height: 100%;
   object-fit: cover;
   object-position: center 42%;
-  filter: saturate(0.9) brightness(0.85) contrast(1.08);
+  filter: saturate(0.72) brightness(0.62) contrast(1.12);
   transform: scale(1.04);
   transition: opacity 1.2s ease;
 }
@@ -32,7 +32,7 @@
   background-image: linear-gradient(rgba(30, 30, 36, 0.4) 1px, transparent 1px),
     linear-gradient(90deg, rgba(30, 30, 36, 0.4) 1px, transparent 1px);
   background-size: 42px 42px;
-  opacity: 0.22;
+  opacity: 0.15;
 }
 .ambient-video-vignette {
   position: absolute;
@@ -62,8 +62,8 @@
   grid-template-columns: auto 1fr auto;
   gap: 40px;
   align-items: center;
-  border-bottom: 1px solid #1e1e24;
-  background: rgba(8, 8, 9, 0.85);
+  border-bottom: 1px solid rgba(55, 55, 67, .72);
+  background: rgba(8, 8, 11, 0.72);
   backdrop-filter: blur(14px);
   position: sticky;
   top: 0;
@@ -130,14 +130,14 @@
   transform: translateY(-2px);
 }
 .mk-button-dark {
-  background: #141418;
+  background: #1478fc;
   color: #f4f3f6;
-  border-color: #2c2c36;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  border-color: #3190ff;
+  box-shadow: 0 8px 28px rgba(20, 120, 252, .18);
 }
 .mk-button-dark:hover {
-  background: #1d1d23;
-  border-color: #1478fc;
+  background: #3590ff;
+  border-color: #78baff;
 }
 .mk-button-light {
   background: #f0eff2;

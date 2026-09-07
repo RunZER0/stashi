@@ -24,7 +24,7 @@ const DEFAULT_NODE_ID = "node-nj-01";
 // Every Dev-tier ("pooled") tenant lives as its own schema inside this one
 // shared database, isolated by Postgres's own permission model (own schema,
 // own role, default-deny on everyone else's) rather than a dedicated
-// database — that's how the $1/mo tier stays cheap without losing isolation.
+// database — that's how the $2/mo tier stays cheap without losing isolation.
 export const POOL_DATABASE = "stashi_pool";
 
 const slugify = (value: string) =>

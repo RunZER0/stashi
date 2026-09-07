@@ -171,7 +171,7 @@ const JobHandlers = {
 
   // 1b. Create a pooled tenant: a schema inside the shared stashi_pool
   // database, isolated by Postgres's own permission model rather than a
-  // dedicated instance. This is how the Dev ($1/mo) tier stays cheap.
+  // dedicated instance. This is how the Dev ($2/mo) tier stays affordable.
   async create_pool_tenant({ pool_database, schema_name, role_name, password, connection_limit = 10 }) {
     const cleanDb = cleanIdent(pool_database);
     const cleanSchema = cleanIdent(schema_name);

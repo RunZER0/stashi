@@ -35,7 +35,7 @@ npm run build
 
 | Plan | Monthly price | Storage | Connections |
 | --- | ---: | ---: | ---: |
-| Dev | $1 | 1 GB | 10 |
+| Dev | $2 | 1 GB | 10 |
 | Starter | $3 | 5 GB | 30 |
 | Production | $5 | 15 GB | 75 |
 | Dedicated | $9+ | 40 GB+ | 200 |

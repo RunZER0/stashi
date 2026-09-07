@@ -6,7 +6,7 @@ import styles from "./marketing.module.css";
 
 const steps = [
   {
-    label: "Agent runs a migration",
+    label: "A migration runs",
     detail: "ALTER TABLE orders DROP COLUMN status",
     tone: "neutral" as const,
     icon: Terminal,
@@ -19,7 +19,7 @@ const steps = [
   },
   {
     label: "The migration was wrong",
-    detail: "Column dropped, feature branch breaks",
+    detail: "Column dropped, a release breaks",
     tone: "warn" as const,
     icon: AlertTriangle,
   },
@@ -40,7 +40,7 @@ export function HeroVisual() {
   };
 
   return (
-    <div className={styles.storyCard} aria-label="How Stashi catches a bad agent migration">
+    <div className={styles.storyCard} aria-label="How Stashi protects a database from a bad migration">
       <div className={styles.storyCardTop}>
         <span>SAFETY NET</span>
         <span className={styles.storyCardLive}>
@@ -64,7 +64,7 @@ export function HeroVisual() {
 
       <div className={styles.storyOutcome}>
         <ShieldCheck size={16} />
-        <span>Nothing an agent does here is unrecoverable.</span>
+        <span>Risky changes do not have to be permanent.</span>
       </div>
 
       <button className={styles.storyCopy} onClick={copy} type="button">

@@ -8,7 +8,7 @@ export function SiteHeader() {
         <img src="/stashi-logo-light.png" alt="Stashi" height={40} style={{ height: "40px", width: "auto", display: "block" }} />
       </Link>
       <nav className="mk-nav" aria-label="Primary navigation">
-        <Link href="/#how-it-works">How it works</Link>
+        <Link href="/#control">Control model</Link>
         <Link href="/pricing">Pricing</Link>
         <Link href="/docs">Docs</Link>
         <Link href="/about">About</Link>
@@ -16,7 +16,7 @@ export function SiteHeader() {
       <div className="mk-actions">
         <Link className="mk-signin" href="/login">Sign in</Link>
         <Link className="mk-button mk-button-dark mk-button-small" href="/login">
-          Create database <ArrowRight size={14} />
+          Start free <ArrowRight size={14} />
         </Link>
       </div>
     </header>

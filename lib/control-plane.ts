@@ -5,7 +5,7 @@ export type DatabaseStatus = "healthy" | "provisioning" | "suspended" | "failed"
 // "isolated": its own database + role, full separation (Starter and up).
 // "pooled": a schema inside a shared database (stashi_pool), separated from
 // other tenants by Postgres's own permission model rather than a dedicated
-// instance -- how the Dev tier gets to $1/mo without losing real isolation.
+// instance -- how the Dev tier gets to $2/mo without losing real isolation.
 export type TenancyMode = "isolated" | "pooled";
 
 export type ManagedDatabase = {

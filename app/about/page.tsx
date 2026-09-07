@@ -25,11 +25,12 @@ export default function AboutPage() {
 
             <h2>What Stashi is</h2>
             <p>
-              Stashi is a managed PostgreSQL 17 hosting service built for developers and AI agents. Every
+              Stashi is a managed PostgreSQL 17 hosting service built for developers, products, and teams
+              that need dependable data infrastructure. Every
               database is provisioned automatically, reachable over TLS through PgBouncer connection
               pooling, and billed on a fixed monthly plan with no separate compute metering. The service
               includes a browser console (SQL editor, connection details, backups), a Model Context
-              Protocol (MCP) server so AI coding agents can inspect schema and run scoped queries directly,
+              Protocol (MCP) server so coding tools and automated workflows can inspect schema and run scoped queries directly,
               and both logical checkpoints and continuous point-in-time recovery for backups.
             </p>
 

@@ -8,7 +8,7 @@ This document defines the single source of truth for commercial plans and their 
 
 | Plan Tier | Price / Month | Storage Limit | PgBouncer Max Conn | PostgreSQL Conn Limit | Backup Retention | Placement Class | Max CPU Priority (cgroups) |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Dev** | $1.00 (Flat) | 1 GB (1,024 MB) | 10 client connections | 5 backend conns | 2 days (daily snapshot) | Shared Multi-tenant | Low / Nice 10 |
+| **Dev** | $2.00 (Flat) | 1 GB (1,024 MB) | 10 client connections | 5 backend conns | 2 days (daily snapshot) | Shared Multi-tenant | Low / Nice 10 |
 | **Starter** | $3.00 (Flat) | 5 GB (5,120 MB) | 25 client connections | 10 backend conns | 7 days (daily snapshot) | Shared Multi-tenant | Normal / Nice 0 |
 | **Production** | $5.00 (Flat) | 15 GB (15,360 MB) | 60 client connections | 20 backend conns | 14 days (daily snapshot) | Shared Multi-tenant | High / Nice -5 |
 | **Dedicated** | $9.00+ (Fixed) | 40 GB+ (Custom) | 200+ client connections | 50+ backend conns | 30 days (Point-in-Time) | Dedicated Node | Dedicated CPU/RAM |
@@ -19,7 +19,7 @@ This document defines the single source of truth for commercial plans and their 
 
 1. **Zero Compute Metering Surcharges:**
    - Under no circumstances does an autonomous agent reasoning loop incur variable per-second or per-query compute overages.
-   - Plans are 100% hard-capped at their stated monthly fee ($1, $3, $5, $9+).
+   - Plans are 100% hard-capped at their stated monthly fee ($2, $3, $5, $9+).
 
 2. **Storage Limit Enforcement Policy:**
    - PostgreSQL does not natively provide POSIX filesystem quotas per database in a shared cluster.
