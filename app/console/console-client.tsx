@@ -289,13 +289,7 @@ export default function ConsoleClient({
               <span>Workspace spend</span>
               <strong>${databases.reduce((sum, item) => sum + (getPlan(item.plan).price ?? 9), 0)} / mo</strong>
             </div>
-            <small>Hard-capped · Zero loop overages.</small>
           </div>
-          <form action="/api/logout" method="post">
-            <button className="logout-link" type="submit">
-              <ArrowLeft size={13} /> Sign out
-            </button>
-          </form>
         </div>
       </aside>
 
@@ -382,10 +376,6 @@ export default function ConsoleClient({
             <>
               <div className="database-heading">
                 <div>
-                  <span className="mono section-index">
-                    POSTGRESQL {db.version} · {db.region.toUpperCase()} ·{" "}
-                    {db.tenancyMode === "pooled" ? "SHARED POOL, OWN SCHEMA" : "ISOLATED DATABASE"} · MCP READY
-                  </span>
                   <h1>{db.name}</h1>
                   <p>
                     Created{" "}
@@ -393,13 +383,9 @@ export default function ConsoleClient({
                       month: "short",
                       day: "numeric",
                       year: "numeric",
-                    })}{" "}
-                    · {plan!.name} plan (${plan!.price === null ? "9+" : plan!.price}/mo flat)
+                    })}
                   </p>
                 </div>
-                <button className="button button-dark button-compact" onClick={() => setCreateOpen(true)}>
-                  <Plus size={15} /> Create database
-                </button>
               </div>
 
               {db.status === "provisioning" && (
