@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { verifyAgentSignature } from "@/lib/agent-auth";
-import { recordNodeTelemetry } from "@/lib/store";
+import { recordDatabaseTelemetry, recordNodeTelemetry } from "@/lib/store";
 
 export async function POST(req: Request) {
   const rawBody = await req.text();
@@ -11,12 +11,15 @@ export async function POST(req: Request) {
 
   try {
     const telemetry = JSON.parse(rawBody || "{}") as Record<string, unknown>;
-    const { nodeId, cpuPct, memoryPct, diskPct, databaseCount } = telemetry as {
+    const { nodeId, cpuPct, memoryPct, diskPct, databaseCount, databases, poolSchemas, connectionsByRole } = telemetry as {
       nodeId?: string;
       cpuPct?: number;
       memoryPct?: number;
       diskPct?: number;
       databaseCount?: number;
+      databases?: { name: string; sizeBytes: number }[];
+      poolSchemas?: { schema: string; sizeBytes: number }[];
+      connectionsByRole?: { role: string; connections: number }[];
     };
 
     if (!nodeId) return NextResponse.json({ error: "nodeId required" }, { status: 400 });
@@ -31,6 +34,13 @@ export async function POST(req: Request) {
     }
 
     await recordNodeTelemetry(nodeId, patch);
+
+    // Per-database part of the same payload -- previously parsed off the
+    // request and never read again. See lib/store.ts recordDatabaseTelemetry
+    // for why storage/connections sat frozen at 0 despite real traffic.
+    if (Array.isArray(databases) || Array.isArray(poolSchemas) || Array.isArray(connectionsByRole)) {
+      await recordDatabaseTelemetry({ databases, poolSchemas, connectionsByRole });
+    }
 
     return NextResponse.json({ success: true, recordedAt: new Date().toISOString() });
   } catch (err: any) {

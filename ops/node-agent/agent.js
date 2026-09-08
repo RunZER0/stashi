@@ -488,6 +488,34 @@ const JobHandlers = {
 
     return { status: "restored" };
   },
+
+  // 10. Delete a checkpoint past its plan's retention -- the control plane
+  // has already deleted the row (see reapExpiredCheckpoints); this just
+  // cleans up what it can't reach itself: the actual file on this node, and
+  // the off-node copy, if one was ever made. Tolerates the file already
+  // being gone -- retries of a job that partially succeeded shouldn't fail
+  // over that.
+  async delete_checkpoint({ checkpoint_id, file_path, off_node }) {
+    const cleanCheckpoint = cleanIdent(checkpoint_id);
+    const target = file_path || `${CHECKPOINT_DIR}/${cleanCheckpoint}.dump`;
+    await run("rm", ["-f", target]).catch(() => {});
+
+    if (off_node) {
+      const r2Endpoint = process.env.R2_ENDPOINT_URL;
+      const r2Bucket = process.env.R2_BUCKET;
+      if (r2Endpoint && r2Bucket) {
+        try {
+          await run("aws", ["--endpoint-url", r2Endpoint, "s3", "rm", `s3://${r2Bucket}/${cleanCheckpoint}.dump`]);
+        } catch (err) {
+          // The local file is gone either way -- an off-node straggler
+          // costs pennies and isn't worth failing the job over.
+          console.error(`[Checkpoint off-node delete failed]: ${err.message}`);
+        }
+      }
+    }
+
+    return { status: "deleted" };
+  },
 };
 
 // Periodic Telemetry Collector
@@ -515,6 +543,52 @@ async function collectAndSendMetrics() {
       // psql might be in mock mode during local dev
     }
 
+    // Pooled (Dev-tier) tenants all share one physical database
+    // (stashi_pool), so pg_database_size above only reports one combined
+    // number for every tenant in it -- no use per-tenant. Real per-tenant
+    // storage for pooled tenants has to come from their own schema instead:
+    // sum of every table/index/toast size under it, the same thing
+    // pg_total_relation_size reports per-table.
+    let poolSchemas = [];
+    try {
+      const poolSchemaRaw = await runPsql(
+        `SELECT n.nspname, COALESCE(sum(pg_total_relation_size(c.oid)), 0) FROM pg_namespace n
+         LEFT JOIN pg_class c ON c.relnamespace = n.oid
+         WHERE n.nspname NOT IN ('pg_catalog','information_schema','public','pg_toast')
+         GROUP BY n.nspname;`,
+        ["-d", "stashi_pool"]
+      );
+      poolSchemas = poolSchemaRaw
+        .split("\n")
+        .filter(Boolean)
+        .map((line) => {
+          const [schema, size] = line.split("|");
+          return { schema, sizeBytes: parseInt(size, 10) || 0 };
+        });
+    } catch (e) {
+      // stashi_pool may not exist yet (fresh node) or psql may be in mock
+      // mode during local dev -- either way, no pooled tenants to report.
+    }
+
+    // Live connection count per role -- the one number that's the same
+    // lookup for isolated and pooled tenants alike, since every database
+    // (however it's isolated) has its own dedicated role.
+    let connectionsByRole = [];
+    try {
+      const connRaw = await runPsql(
+        "SELECT usename, count(*) FROM pg_stat_activity WHERE usename IS NOT NULL GROUP BY usename;"
+      );
+      connectionsByRole = connRaw
+        .split("\n")
+        .filter(Boolean)
+        .map((line) => {
+          const [role, n] = line.split("|");
+          return { role, connections: parseInt(n, 10) || 0 };
+        });
+    } catch (e) {
+      // psql might be in mock mode during local dev
+    }
+
     const payload = {
       nodeId: NODE_ID,
       region: REGION,
@@ -523,6 +597,8 @@ async function collectAndSendMetrics() {
       diskPct: 24,
       databaseCount: databases.length || 1,
       databases,
+      poolSchemas,
+      connectionsByRole,
       timestamp: new Date().toISOString(),
     };
 
@@ -576,9 +652,28 @@ async function sweepExpiredDatabases() {
   }
 }
 
+// Checkpoint Retention Sweep — same idea as the TTL sweep above, for
+// checkpoints past their plan's backupRetentionDays instead of databases
+// past their TTL. The control plane decides what's expired and deletes the
+// row; this only pings it on a schedule and executes the resulting
+// delete_checkpoint jobs through the normal job queue.
+const CHECKPOINT_SWEEP_INTERVAL = parseInt(process.env.STASHI_CHECKPOINT_SWEEP_INTERVAL_SEC || "3600", 10) * 1000;
+async function sweepExpiredCheckpoints() {
+  try {
+    const res = await postControlPlane("/api/agent/checkpoint-sweep", { nodeId: NODE_ID });
+    if (res.reaped?.length) {
+      console.log(`[Checkpoint Sweep] Reaped ${res.reaped.length} expired checkpoint(s):`, res.reaped.map((r) => r.label).join(", "));
+    }
+  } catch (err) {
+    console.error(`[Checkpoint Sweep Error]: ${err.message}`);
+  }
+}
+
 console.log(`[Stashi Agent] Started for node: ${NODE_ID} (Region: ${REGION})`);
 pollJobs();
 setInterval(collectAndSendMetrics, METRICS_INTERVAL);
 collectAndSendMetrics();
 setInterval(sweepExpiredDatabases, TTL_SWEEP_INTERVAL);
 sweepExpiredDatabases();
+setInterval(sweepExpiredCheckpoints, CHECKPOINT_SWEEP_INTERVAL);
+sweepExpiredCheckpoints();

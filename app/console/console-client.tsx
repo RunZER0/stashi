@@ -291,8 +291,11 @@ export default function ConsoleClient({
               }}
             >
               <span className={`db-led ${item.status}`} />
-              <span>{item.name}</span>
-              <small>{getPlan(item.plan).name}</small>
+              <span style={{ display: "flex", alignItems: "center", gap: "5px", minWidth: 0 }}>
+                {item.parentDatabaseId && <GitBranch size={10} style={{ flexShrink: 0, color: "var(--muted)" }} />}
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</span>
+              </span>
+              <small>{item.parentDatabaseId ? "Branch" : getPlan(item.plan).name}</small>
             </button>
           ))}
           {databases.length === 0 && <small style={{ color: "var(--muted)", padding: "8px" }}>None yet</small>}
@@ -405,6 +408,12 @@ export default function ConsoleClient({
             <>
               <div className="database-heading">
                 <div>
+                  {db.parentDatabaseId && (
+                    <span className="mono section-index" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <GitBranch size={12} />
+                      BRANCH OF {databases.find((d) => d.id === db.parentDatabaseId)?.name?.toUpperCase() || db.parentDatabaseId}
+                    </span>
+                  )}
                   <h1>{db.name}</h1>
                   <p>
                     Created{" "}

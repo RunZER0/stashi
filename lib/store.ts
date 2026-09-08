@@ -420,6 +420,20 @@ export async function deleteDatabase(email: string, id: string): Promise<Managed
      VALUES ($1,$2,$3,$4,'pending',$5,$6)`,
     [newId("job"), DEFAULT_NODE_ID, target.tenancyMode === "pooled" ? "delete_pool_tenant" : "delete_database", JSON.stringify(payload), email, id]
   );
+
+  // A deleted database's checkpoints have nothing left to be a rollback
+  // point for -- clean them up now instead of leaving them to orphan
+  // (confirmed this was happening: real checkpoint rows, and real files on
+  // the node, surviving indefinitely past their database's own deletion,
+  // for every prior delete before this existed).
+  const { rows: orphanedCheckpoints } = await pool.query(
+    `DELETE FROM checkpoints WHERE database_id = $1 AND status = 'ready' RETURNING id, file_path, off_node`,
+    [id]
+  );
+  for (const cp of orphanedCheckpoints) {
+    await enqueueJob(DEFAULT_NODE_ID, "delete_checkpoint", { checkpoint_id: cp.id, file_path: cp.file_path, off_node: cp.off_node }, email, id);
+  }
+
   await pushActivity(email, "you", "database.deleted", target.name);
   return target;
 }
@@ -507,6 +521,43 @@ export async function recordNodeTelemetry(nodeId: string, patch: Partial<Node>) 
     values
   );
   return rows[0] ? rowToNode(rows[0]) : null;
+}
+
+// Consumes the per-database part of the node agent's telemetry payload --
+// real numbers it already samples every METRICS_INTERVAL (pg_database_size
+// for isolated databases, schema size for pooled tenants, pg_stat_activity
+// connection counts by role) that the console's Overview/Metrics tabs were
+// previously never fed, so storage and connections sat frozen at whatever
+// they were initialized to regardless of real usage. All parameterized --
+// no dynamic identifiers, just matching already-known-safe column values.
+export async function recordDatabaseTelemetry(input: {
+  databases?: { name: string; sizeBytes: number }[];
+  poolSchemas?: { schema: string; sizeBytes: number }[];
+  connectionsByRole?: { role: string; connections: number }[];
+}) {
+  await ensureSchema();
+  const pool = getPool();
+
+  for (const d of input.databases || []) {
+    if (!d?.name) continue;
+    await pool.query(
+      `UPDATE databases SET storage_used_mb = $2 WHERE database_name = $1 AND tenancy_mode = 'isolated'`,
+      [d.name, Math.round((d.sizeBytes || 0) / (1024 * 1024))]
+    );
+  }
+
+  for (const s of input.poolSchemas || []) {
+    if (!s?.schema) continue;
+    await pool.query(
+      `UPDATE databases SET storage_used_mb = $2 WHERE pool_schema = $1 AND tenancy_mode = 'pooled'`,
+      [s.schema, Math.round((s.sizeBytes || 0) / (1024 * 1024))]
+    );
+  }
+
+  for (const c of input.connectionsByRole || []) {
+    if (!c?.role) continue;
+    await pool.query(`UPDATE databases SET connections = $2 WHERE username = $1`, [c.role, c.connections || 0]);
+  }
 }
 
 // --- Checkpoints & backups (one real mechanism, two labels) ----------------
@@ -598,6 +649,71 @@ export async function restoreCheckpoint(
 
   const { rows: jobRows } = await pool.query(`SELECT * FROM jobs WHERE id = $1`, [jobId]);
   return { job: rowToJob(jobRows[0]) };
+}
+
+// Finds and deletes checkpoints past their owning database's plan
+// (backupRetentionDays), the retention every pricing/terms page already
+// advertises but that nothing previously enforced -- checkpoints accumulated
+// forever, in the table and as real files on the node, until someone
+// deleted them by hand. Never reaps the single most recent ready checkpoint
+// per database regardless of age, so a customer can never be left with zero
+// rollback points just because retention lapsed -- the point of this
+// product is a safety net, not one that quietly empties itself.
+export async function reapExpiredCheckpoints(): Promise<{ id: string; label: string; databaseId: string; ownerEmail: string; reason: "expired" | "orphaned" }[]> {
+  await ensureSchema();
+  const pool = getPool();
+  const reaped: { id: string; label: string; databaseId: string; ownerEmail: string; reason: "expired" | "orphaned" }[] = [];
+
+  // Orphaned: the database this checkpoint belongs to no longer exists at
+  // all (deleted before deleteDatabase cleaned up its own checkpoints on
+  // the way out -- every checkpoint from before that existed). No retention
+  // math applies -- there's no database left to keep a rollback point for,
+  // so every one of these is unconditionally safe to reap, not just the
+  // ones past an age threshold.
+  const { rows: orphaned } = await pool.query(`
+    DELETE FROM checkpoints c
+    WHERE c.status = 'ready' AND NOT EXISTS (SELECT 1 FROM databases d WHERE d.id = c.database_id)
+    RETURNING id, label, database_id, owner_email, file_path, off_node
+  `);
+  for (const row of orphaned) {
+    await enqueueJob(DEFAULT_NODE_ID, "delete_checkpoint", { checkpoint_id: row.id, file_path: row.file_path, off_node: row.off_node }, row.owner_email, row.database_id);
+    await pushActivity(row.owner_email, "system", "checkpoint.orphaned.deleted", row.label);
+    reaped.push({ id: row.id, label: row.label, databaseId: row.database_id, ownerEmail: row.owner_email, reason: "orphaned" });
+  }
+
+  // Expired: the database is still live, but this checkpoint has aged past
+  // its plan's backupRetentionDays. Never reaps the single most recent
+  // ready checkpoint per database regardless of age, so a customer can
+  // never be left with zero rollback points just because retention lapsed.
+  const { rows } = await pool.query(`
+    SELECT id, label, database_id, owner_email, file_path, off_node, created_at, plan FROM (
+      SELECT c.id, c.label, c.database_id, c.owner_email, c.file_path, c.off_node, c.created_at, d.plan,
+             row_number() OVER (PARTITION BY c.database_id ORDER BY c.created_at DESC) AS rn
+      FROM checkpoints c
+      JOIN databases d ON d.id = c.database_id
+      WHERE c.status = 'ready'
+    ) sub
+    WHERE rn > 1
+  `);
+  for (const row of rows) {
+    const retentionMs = getPlan(row.plan).backupRetentionDays * 24 * 3600_000;
+    const ageMs = Date.now() - new Date(row.created_at).getTime();
+    if (ageMs <= retentionMs) continue;
+
+    const { rows: deleted } = await pool.query(`DELETE FROM checkpoints WHERE id = $1 RETURNING *`, [row.id]);
+    if (!deleted[0]) continue;
+
+    await enqueueJob(
+      DEFAULT_NODE_ID,
+      "delete_checkpoint",
+      { checkpoint_id: row.id, file_path: row.file_path, off_node: row.off_node },
+      row.owner_email,
+      row.database_id
+    );
+    await pushActivity(row.owner_email, "system", "checkpoint.retention_expired.deleted", row.label);
+    reaped.push({ id: row.id, label: row.label, databaseId: row.database_id, ownerEmail: row.owner_email, reason: "expired" });
+  }
+  return reaped;
 }
 
 // --- Agent job queue -------------------------------------------------------
