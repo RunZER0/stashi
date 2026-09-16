@@ -157,6 +157,270 @@ export async function ensureSchema() {
     INSERT INTO nodes (id, label, region, capacity_status)
     VALUES ('node-nj-01', 'NJ · 01', 'New Jersey, US', 'pending')
     ON CONFLICT (id) DO NOTHING;
+
+    -- Better Auth core tables
+    CREATE TABLE IF NOT EXISTS "user" (
+      id text PRIMARY KEY,
+      name text NOT NULL,
+      email text NOT NULL UNIQUE,
+      "emailVerified" boolean NOT NULL DEFAULT false,
+      image text,
+      "createdAt" timestamptz NOT NULL DEFAULT now(),
+      "updatedAt" timestamptz NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS "session" (
+      id text PRIMARY KEY,
+      "expiresAt" timestamptz NOT NULL,
+      token text NOT NULL UNIQUE,
+      "createdAt" timestamptz NOT NULL DEFAULT now(),
+      "updatedAt" timestamptz NOT NULL DEFAULT now(),
+      "ipAddress" text,
+      "userAgent" text,
+      "userId" text NOT NULL REFERENCES "user"(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS "session_userId_idx" ON "session"("userId");
+
+    CREATE TABLE IF NOT EXISTS "account" (
+      id text PRIMARY KEY,
+      "accountId" text NOT NULL,
+      "providerId" text NOT NULL,
+      "userId" text NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+      "accessToken" text,
+      "refreshToken" text,
+      "idToken" text,
+      "accessTokenExpiresAt" timestamptz,
+      "refreshTokenExpiresAt" timestamptz,
+      scope text,
+      password text,
+      "createdAt" timestamptz NOT NULL DEFAULT now(),
+      "updatedAt" timestamptz NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS "account_userId_idx" ON "account"("userId");
+
+    CREATE TABLE IF NOT EXISTS "verification" (
+      id text PRIMARY KEY,
+      identifier text NOT NULL,
+      value text NOT NULL,
+      "expiresAt" timestamptz NOT NULL,
+      "createdAt" timestamptz NOT NULL DEFAULT now(),
+      "updatedAt" timestamptz NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS "jwks" (
+      id text PRIMARY KEY,
+      "publicKey" text NOT NULL,
+      "privateKey" text NOT NULL,
+      "createdAt" timestamptz NOT NULL DEFAULT now(),
+      "expiresAt" timestamptz,
+      alg text,
+      crv text
+    );
+
+    CREATE TABLE IF NOT EXISTS "oauthClient" (
+      id text PRIMARY KEY,
+      "clientId" text NOT NULL UNIQUE,
+      "clientSecret" text,
+      "clientDiscoveryId" text,
+      disabled boolean DEFAULT false,
+      "skipConsent" boolean DEFAULT false,
+      "enableEndSession" boolean DEFAULT false,
+      "subjectType" text,
+      scopes text[],
+      "clientCredentialsScopes" text[],
+      "userId" text REFERENCES "user"(id) ON DELETE CASCADE,
+      "createdAt" timestamptz DEFAULT now(),
+      "updatedAt" timestamptz DEFAULT now(),
+      name text,
+      uri text,
+      icon text,
+      contacts text[],
+      tos text,
+      policy text,
+      "softwareId" text,
+      "softwareVersion" text,
+      "softwareStatement" text,
+      "redirectUris" text[] NOT NULL,
+      "postLogoutRedirectUris" text[],
+      "backchannelLogoutUri" text,
+      "backchannelLogoutSessionRequired" boolean,
+      "tokenEndpointAuthMethod" text,
+      "applicationType" text,
+      jwks text,
+      "jwksUri" text,
+      "grantTypes" text[],
+      "responseTypes" text[],
+      "requirePKCE" boolean,
+      "dpopBoundAccessTokens" boolean DEFAULT false,
+      "referenceId" text,
+      metadata jsonb
+    );
+
+    CREATE TABLE IF NOT EXISTS "oauthResource" (
+      id text PRIMARY KEY,
+      identifier text NOT NULL UNIQUE,
+      name text NOT NULL,
+      "accessTokenTtl" integer,
+      "refreshTokenTtl" integer,
+      "signingAlgorithm" text,
+      "signingKeyId" text,
+      "allowedScopes" text[],
+      "customClaims" jsonb,
+      "dpopBoundAccessTokensRequired" boolean DEFAULT false,
+      disabled boolean DEFAULT false,
+      "createdAt" timestamptz DEFAULT now(),
+      "updatedAt" timestamptz DEFAULT now(),
+      "policyVersion" integer DEFAULT 1,
+      metadata jsonb
+    );
+
+    CREATE TABLE IF NOT EXISTS "oauthClientResource" (
+      id text PRIMARY KEY,
+      "clientId" text NOT NULL REFERENCES "oauthClient"("clientId") ON DELETE CASCADE,
+      "resourceId" text NOT NULL REFERENCES "oauthResource"(identifier) ON DELETE CASCADE,
+      metadata jsonb,
+      "createdAt" timestamptz DEFAULT now(),
+      UNIQUE("clientId", "resourceId")
+    );
+
+    CREATE TABLE IF NOT EXISTS "oauthRefreshToken" (
+      id text PRIMARY KEY,
+      token text NOT NULL UNIQUE,
+      "clientId" text NOT NULL REFERENCES "oauthClient"("clientId") ON DELETE CASCADE,
+      "sessionId" text REFERENCES "session"(id) ON DELETE SET NULL,
+      "userId" text NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+      "referenceId" text,
+      "authorizationCodeId" text,
+      resources text[],
+      "requestedUserInfoClaims" text[],
+      "expiresAt" timestamptz NOT NULL,
+      "createdAt" timestamptz NOT NULL DEFAULT now(),
+      revoked timestamptz,
+      "rotatedAt" timestamptz,
+      "rotationReplayResponse" text,
+      "rotationReplayExpiresAt" timestamptz,
+      "authTime" timestamptz,
+      confirmation jsonb,
+      scopes text[] NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS "oauthRefreshToken_clientId_idx" ON "oauthRefreshToken"("clientId");
+    CREATE INDEX IF NOT EXISTS "oauthRefreshToken_userId_idx" ON "oauthRefreshToken"("userId");
+
+    CREATE TABLE IF NOT EXISTS "oauthAccessToken" (
+      id text PRIMARY KEY,
+      token text UNIQUE,
+      "clientId" text NOT NULL REFERENCES "oauthClient"("clientId") ON DELETE CASCADE,
+      "sessionId" text REFERENCES "session"(id) ON DELETE SET NULL,
+      "userId" text REFERENCES "user"(id) ON DELETE CASCADE,
+      "referenceId" text,
+      "authorizationCodeId" text,
+      resources text[],
+      "requestedUserInfoClaims" text[],
+      "refreshId" text REFERENCES "oauthRefreshToken"(id) ON DELETE CASCADE,
+      "expiresAt" timestamptz NOT NULL,
+      "createdAt" timestamptz NOT NULL DEFAULT now(),
+      revoked timestamptz,
+      confirmation jsonb,
+      scopes text[] NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS "oauthAccessToken_clientId_idx" ON "oauthAccessToken"("clientId");
+    CREATE INDEX IF NOT EXISTS "oauthAccessToken_userId_idx" ON "oauthAccessToken"("userId");
+
+    CREATE TABLE IF NOT EXISTS "oauthConsent" (
+      id text PRIMARY KEY,
+      "clientId" text NOT NULL REFERENCES "oauthClient"("clientId") ON DELETE CASCADE,
+      "userId" text REFERENCES "user"(id) ON DELETE CASCADE,
+      "referenceId" text,
+      resources text[],
+      "requestedUserInfoClaims" text[],
+      scopes text[] NOT NULL,
+      "createdAt" timestamptz DEFAULT now(),
+      "updatedAt" timestamptz DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS "oauthConsent_client_user_idx" ON "oauthConsent"("clientId", "userId");
+
+    CREATE TABLE IF NOT EXISTS "oauthClientAssertion" (
+      id text PRIMARY KEY,
+      "expiresAt" timestamptz NOT NULL
+    );
+
+    -- Stashi Project Multi-Tenancy & RBAC
+    CREATE TABLE IF NOT EXISTS projects (
+      id text PRIMARY KEY,
+      name text NOT NULL,
+      slug text UNIQUE,
+      owner_user_id text,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS project_members (
+      id text PRIMARY KEY,
+      project_id text NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      user_email text NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+      role text NOT NULL DEFAULT 'owner',
+      created_at timestamptz NOT NULL DEFAULT now(),
+      UNIQUE(project_id, user_email)
+    );
+    CREATE INDEX IF NOT EXISTS project_members_lookup_idx ON project_members(project_id, user_email);
+    CREATE INDEX IF NOT EXISTS project_members_user_idx ON project_members(user_email);
+
+    -- Stashi Audit Logging
+    CREATE TABLE IF NOT EXISTS auth_audit_events (
+      id text PRIMARY KEY,
+      timestamp timestamptz NOT NULL DEFAULT now(),
+      request_id text,
+      user_id text,
+      project_id text,
+      client_id text,
+      event text NOT NULL,
+      outcome text NOT NULL,
+      ip text,
+      user_agent text,
+      details jsonb
+    );
+    CREATE INDEX IF NOT EXISTS auth_audit_events_event_idx ON auth_audit_events(event, timestamp DESC);
+    CREATE INDEX IF NOT EXISTS auth_audit_events_user_idx ON auth_audit_events(user_id, timestamp DESC);
+    CREATE INDEX IF NOT EXISTS auth_audit_events_project_idx ON auth_audit_events(project_id, timestamp DESC);
+
+    -- Add project_id & hashed key columns
+    ALTER TABLE databases ADD COLUMN IF NOT EXISTS project_id text REFERENCES projects(id);
+    CREATE INDEX IF NOT EXISTS databases_project_idx ON databases(project_id);
+
+    ALTER TABLE scoped_keys ADD COLUMN IF NOT EXISTS project_id text REFERENCES projects(id);
+    ALTER TABLE scoped_keys ADD COLUMN IF NOT EXISTS key_hash text;
+    ALTER TABLE scoped_keys ADD COLUMN IF NOT EXISTS key_prefix text;
+    ALTER TABLE scoped_keys ADD COLUMN IF NOT EXISTS expires_at timestamptz;
+    CREATE INDEX IF NOT EXISTS scoped_keys_hash_idx ON scoped_keys(key_hash) WHERE revoked_at IS NULL;
+
+    ALTER TABLE account_keys ADD COLUMN IF NOT EXISTS project_id text REFERENCES projects(id);
+    ALTER TABLE account_keys ADD COLUMN IF NOT EXISTS key_hash text;
+    ALTER TABLE account_keys ADD COLUMN IF NOT EXISTS key_prefix text;
+    ALTER TABLE account_keys ADD COLUMN IF NOT EXISTS expires_at timestamptz;
+    CREATE INDEX IF NOT EXISTS account_keys_hash_idx ON account_keys(key_hash) WHERE revoked_at IS NULL;
+
+    -- Additive migration backfill: ensure default projects for existing users
+    INSERT INTO projects (id, name, slug)
+    SELECT 'proj_' || substr(md5(email), 1, 16), 'Personal', 'personal-' || substr(md5(email), 1, 8)
+    FROM users
+    ON CONFLICT (id) DO NOTHING;
+
+    INSERT INTO project_members (id, project_id, user_email, role)
+    SELECT 'pm_' || substr(md5(email), 1, 16), 'proj_' || substr(md5(email), 1, 16), email, 'owner'
+    FROM users
+    ON CONFLICT (project_id, user_email) DO NOTHING;
+
+    UPDATE databases d
+    SET project_id = 'proj_' || substr(md5(d.owner_email), 1, 16)
+    WHERE d.project_id IS NULL;
+
+    UPDATE scoped_keys k
+    SET project_id = 'proj_' || substr(md5(k.owner_email), 1, 16)
+    WHERE k.project_id IS NULL;
+
+    UPDATE account_keys a
+    SET project_id = 'proj_' || substr(md5(a.owner_email), 1, 16)
+    WHERE a.project_id IS NULL;
   `);
   migrated = true;
 }
