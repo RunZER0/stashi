@@ -243,6 +243,12 @@ export default function ConsoleClient({
               <div className="menu-scrim" onClick={() => setAccountMenuOpen(false)} />
               <div className="quick-menu" role="menu">
                 <span className="quick-menu-label">{email}</span>
+                <Link className="quick-menu-item" href="/account/security" onClick={() => setAccountMenuOpen(false)}>
+                  <ShieldCheck size={14} /> Security Settings
+                </Link>
+                <Link className="quick-menu-item" href="/account/authorized-apps" onClick={() => setAccountMenuOpen(false)}>
+                  <KeyRound size={14} /> Authorized Apps
+                </Link>
                 <form action="/api/logout" method="post">
                   <button className="quick-menu-item" type="submit">
                     <LogOut size={14} /> Sign out
@@ -1017,9 +1023,260 @@ function AccountSettingsView({
         </div>
       </div>
       <div className="panel-stack">
+        <OAuthClientsPanel notify={notify} copy={copy} />
         <AccountKeysPanel origin={origin} notify={notify} copy={copy} />
       </div>
     </>
+  );
+}
+
+function OAuthClientsPanel({
+  notify,
+  copy,
+}: {
+  notify: (m: string) => void;
+  copy: (v: string, l?: string) => void;
+}) {
+  const [clients, setClients] = useState<Array<{
+    clientId: string;
+    name: string;
+    redirectUris: string[];
+    tokenEndpointAuthMethod: string;
+    createdAt: string;
+  }> | null>(null);
+  const [name, setName] = useState("");
+  const [redirectUris, setRedirectUris] = useState("");
+  const [clientType, setClientType] = useState<"public" | "confidential">("public");
+  const [creating, setCreating] = useState(false);
+  const [secretNotice, setSecretNotice] = useState<{ clientId: string; clientSecret: string } | null>(null);
+
+  const load = async () => {
+    try {
+      const res = await fetch("/api/oauth/clients");
+      if (res.ok) {
+        const payload = await res.json();
+        setClients(payload.clients ?? []);
+      }
+    } catch {
+      //
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const create = async () => {
+    if (!name.trim()) return;
+    setCreating(true);
+    try {
+      const uris = redirectUris
+        .split(/[\n,]/)
+        .map((u) => u.trim())
+        .filter(Boolean);
+      const res = await fetch("/api/oauth/clients", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name, redirectUris: uris, clientType }),
+      });
+      const payload = await res.json();
+      if (!res.ok) {
+        notify(payload.error || "Could not create OAuth application");
+      } else {
+        notify(`Created application "${name}"`);
+        setName("");
+        setRedirectUris("");
+        if (payload.client?.clientSecret) {
+          setSecretNotice({
+            clientId: payload.client.clientId,
+            clientSecret: payload.client.clientSecret,
+          });
+        }
+        await load();
+      }
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const rotateSecret = async (clientId: string) => {
+    if (!window.confirm("Rotate client secret? Any app using the previous secret will fail immediately.")) return;
+    const res = await fetch(`/api/oauth/clients/${clientId}/rotate-secret`, { method: "POST" });
+    const payload = await res.json();
+    if (res.ok && payload.clientSecret) {
+      setSecretNotice({
+        clientId: payload.clientId,
+        clientSecret: payload.clientSecret,
+      });
+      notify("Client secret rotated. Copy the new secret below.");
+      await load();
+    } else {
+      notify(payload.error || "Failed to rotate secret");
+    }
+  };
+
+  const deleteClient = async (clientId: string, clientName: string) => {
+    if (!window.confirm(`Delete application "${clientName}"? Any active OAuth tokens will be revoked.`)) return;
+    const res = await fetch(`/api/oauth/clients/${clientId}`, { method: "DELETE" });
+    if (res.ok) {
+      notify(`Deleted "${clientName}"`);
+      await load();
+    } else {
+      notify("Failed to delete application");
+    }
+  };
+
+  return (
+    <section className="data-panel">
+      <div className="panel-header">
+        <div>
+          <span className="label">OAUTH 2.1 &amp; OIDC</span>
+          <h3>OAuth Applications</h3>
+        </div>
+      </div>
+      <p className="panel-footnote" style={{ marginTop: 0, paddingTop: 0, borderTop: "none" }}>
+        Register OAuth 2.1 client applications to authorize external web services, desktop tools, and MCP servers via
+        PKCE or client credentials against <code>https://auth.mystashi.online</code>.
+      </p>
+
+      {secretNotice && (
+        <div
+          style={{
+            margin: "16px 0",
+            padding: "16px",
+            background: "rgba(86, 160, 255, 0.08)",
+            border: "1px solid rgba(86, 160, 255, 0.3)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+            <strong style={{ color: "#93c5fd", fontSize: "13px" }}>Client Secret Generated</strong>
+            <button
+              className="icon-button"
+              onClick={() => setSecretNotice(null)}
+              style={{ color: "var(--muted)" }}
+            >
+              <X size={14} />
+            </button>
+          </div>
+          <p style={{ fontSize: "12px", color: "var(--muted)", margin: "0 0 10px" }}>
+            Copy this secret now. It is hashed at rest and will not be displayed again.
+          </p>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <input
+              readOnly
+              value={secretNotice.clientSecret}
+              style={{
+                flex: 1,
+                fontFamily: "monospace",
+                fontSize: "12px",
+                background: "#0c0c0f",
+                border: "1px solid var(--line-dark)",
+                color: "var(--ink)",
+                padding: "0 10px",
+              }}
+            />
+            <button
+              className="button button-dark button-compact"
+              onClick={() => copy(secretNotice.clientSecret, "Client secret copied")}
+            >
+              <Clipboard size={13} /> Copy Secret
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: "grid", gap: "10px", margin: "16px 0" }}>
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          <input
+            placeholder="Application Name, e.g. 'Emerald Connector' or 'CLI'"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            style={{
+              flex: 1,
+              minWidth: "180px",
+              minHeight: "36px",
+              border: "1px solid var(--line-dark)",
+              background: "#131613",
+              padding: "0 10px",
+              color: "var(--ink)",
+            }}
+          />
+          <select
+            value={clientType}
+            onChange={(e) => setClientType(e.target.value as "public" | "confidential")}
+            style={{
+              minHeight: "36px",
+              border: "1px solid var(--line-dark)",
+              background: "#131613",
+              color: "var(--ink)",
+              padding: "0 8px",
+            }}
+          >
+            <option value="public">Public (PKCE mandatory, no secret)</option>
+            <option value="confidential">Confidential (Server-side secret)</option>
+          </select>
+        </div>
+
+        <input
+          placeholder="Redirect URIs (comma-separated, e.g. 'https://localhost/callback, http://127.0.0.1:8080')"
+          value={redirectUris}
+          onChange={(e) => setRedirectUris(e.target.value)}
+          style={{
+            minHeight: "36px",
+            border: "1px solid var(--line-dark)",
+            background: "#131613",
+            padding: "0 10px",
+            color: "var(--ink)",
+          }}
+        />
+
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <button
+            className="button button-dark button-compact"
+            onClick={create}
+            disabled={creating || !name.trim()}
+          >
+            {creating ? <span className="spinner spinner-dark" /> : <Plus size={13} />}
+            Register application
+          </button>
+        </div>
+      </div>
+
+      {clients === null ? (
+        <div className="skeleton skeleton-row" style={{ width: "100%" }} />
+      ) : clients.length === 0 ? (
+        <p className="panel-footnote">No OAuth applications registered yet.</p>
+      ) : (
+        <div className="credential-table">
+          {clients.map((cl) => {
+            const isConfidential = cl.tokenEndpointAuthMethod !== "none";
+            return (
+              <div key={cl.clientId} style={{ gridTemplateColumns: "180px 1fr auto" }}>
+                <div>
+                  <strong>{cl.name}</strong>
+                  <div className="mono" style={{ fontSize: "10px", color: "var(--muted)", marginTop: "2px" }}>
+                    {cl.clientId}
+                  </div>
+                </div>
+                <div style={{ fontSize: "11px", color: "var(--muted)" }}>
+                  <div>Type: {isConfidential ? "Confidential" : "Public (PKCE)"}</div>
+                  <div style={{ marginTop: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    URIs: {cl.redirectUris?.join(", ") || "None"}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: "8px", justifySelf: "end", alignItems: "center" }}>
+                  <button onClick={() => copy(cl.clientId, "Client ID copied")}>Copy ID</button>
+                  {isConfidential && (
+                    <button onClick={() => rotateSecret(cl.clientId)}>Rotate Secret</button>
+                  )}
+                  <button onClick={() => deleteClient(cl.clientId, cl.name)}>Delete</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }
 
