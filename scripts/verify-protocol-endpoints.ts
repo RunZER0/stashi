@@ -3,10 +3,10 @@ try {
   process.loadEnvFile(".env.local");
 } catch {}
 
-import { GET as getOidc } from "../app/.well-known/openid-configuration/route.ts";
-import { GET as getOauth } from "../app/.well-known/oauth-authorization-server/route.ts";
-import { GET as getJwks } from "../app/.well-known/jwks.json/route.ts";
-import { GET as getEmeraldMetadata } from "../app/api/emerald/mcp/.well-known/oauth-protected-resource/route.ts";
+import { GET as getOidc } from "../app/.well-known/openid-configuration/route";
+import { GET as getOauth } from "../app/.well-known/oauth-authorization-server/route";
+import { GET as getJwks } from "../app/.well-known/jwks.json/route";
+import { GET as getEmeraldMetadata } from "../app/api/emerald/mcp/.well-known/oauth-protected-resource/route";
 
 async function verify() {
   console.log("=== Stashi Auth Protocol Endpoint Verification ===");

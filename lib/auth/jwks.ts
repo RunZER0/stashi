@@ -1,7 +1,7 @@
 import { ensureSchema, getPool } from "../db";
 
 export interface JwkKey {
-  kty: string;
+  kty?: string;
   crv?: string;
   x?: string;
   y?: string;
@@ -41,6 +41,7 @@ export async function getPublicJwks(): Promise<JwksResponse> {
       return {
         keys: [
           {
+            kty: publicJwk.kty || "OKP",
             kid: keyId,
             alg: "EdDSA",
             use: "sig",

@@ -10,6 +10,10 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: BETTER_AUTH_URL
+        value: https://auth.mystashi.online
+      - key: BETTER_AUTH_SECRET
+        sync: false
       - key: NEXT_PUBLIC_DB_HOST
         sync: false
       - key: NEXT_PUBLIC_DB_PORT
@@ -35,4 +39,14 @@ services:
       - key: AUTH_GOOGLE_ID
         sync: false
       - key: AUTH_GOOGLE_SECRET
+        sync: false
+      - key: AUTH_ENABLE_LEGACY_DCR
+        value: "false"
+      - key: AUTH_ALLOW_LOCAL_CIMD
+        value: "false"
+      - key: STASHI_EMAIL_PROVIDER
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
         sync: false
