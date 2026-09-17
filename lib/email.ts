@@ -1,5 +1,5 @@
-// Email dispatch abstraction for Stashi Auth.
-// In production, configure SMTP or Resend/Postmark/SendGrid via environment variables.
+// Email dispatch abstraction for Stashi Auth via Brevo.
+// In production, configure Brevo via BREVO_API_KEY and EMAIL_FROM.
 // In development or when unconfigured, logs single-purpose security links safely.
 
 export interface EmailOptions {
@@ -9,9 +9,22 @@ export interface EmailOptions {
   text?: string;
 }
 
+export function parseSender(from: string): { name?: string; email: string } {
+  const match = from.match(/^(?:(.*?)<)?([^<>]+)>?$/);
+  if (match) {
+    const name = match[1]?.trim()?.replace(/^["']|["']$/g, "");
+    const email = match[2]?.trim();
+    if (email) {
+      return name ? { name, email } : { email };
+    }
+  }
+  return { email: from };
+}
+
 export async function sendEmail({ to, subject, html, text }: EmailOptions): Promise<void> {
   const isProd = process.env.NODE_ENV === "production";
   const emailFrom = process.env.EMAIL_FROM || "Stashi Auth <auth@mystashi.online>";
+  const brevoApiKey = process.env.BREVO_API_KEY;
 
   // Log in non-production or for local inspection
   if (!isProd || process.env.DEBUG_AUTH_EMAILS === "true") {
@@ -19,29 +32,32 @@ export async function sendEmail({ to, subject, html, text }: EmailOptions): Prom
     if (text) console.log(`[Email Content]\n${text}`);
   }
 
-  // If Resend API key is configured:
-  if (process.env.RESEND_API_KEY) {
+  // Brevo transactional email dispatch
+  if (brevoApiKey) {
     try {
-      const res = await fetch("https://api.resend.com/emails", {
+      const sender = parseSender(emailFrom);
+      const res = await fetch("https://api.brevo.com/v3/smtp/email", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+          "api-key": brevoApiKey,
           "Content-Type": "application/json",
+          Accept: "application/json",
         },
         body: JSON.stringify({
-          from: emailFrom,
-          to: [to],
+          sender,
+          to: [{ email: to }],
           subject,
-          html,
-          text: text || html.replace(/<[^>]*>/g, ""),
+          htmlContent: html,
+          textContent: text || html.replace(/<[^>]*>/g, ""),
         }),
       });
+
       if (!res.ok) {
         const err = await res.text();
-        console.error("[Email Dispatch] Resend error:", err);
+        console.error("[Email Dispatch] Brevo API error:", res.status, err);
       }
     } catch (err) {
-      console.error("[Email Dispatch] Failed to send via Resend:", err);
+      console.error("[Email Dispatch] Failed to send via Brevo:", err);
     }
   }
 }

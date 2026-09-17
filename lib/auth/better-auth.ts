@@ -10,7 +10,37 @@ import { secureFetchClientMetadataResource } from "./cimd-transport";
 import { getAllResourceIdentifiers, getAllSupportedScopes } from "./resources";
 
 const CANONICAL_ISSUER = process.env.BETTER_AUTH_URL || "https://mystashi.online";
+
+// In production, BETTER_AUTH_SECRET is strictly mandatory and startup must fail if missing
+if (process.env.NODE_ENV === "production" && !process.env.BETTER_AUTH_SECRET) {
+  throw new Error(
+    "CRITICAL: BETTER_AUTH_SECRET environment variable is mandatory in production. Application startup aborted."
+  );
+}
+
 const authSecret = process.env.BETTER_AUTH_SECRET || "stashi-development-secret-must-be-configured-in-prod-123456";
+
+// Conditionally configure social providers only when credentials are fully supplied
+const githubClientId = process.env.GITHUB_CLIENT_ID || process.env.AUTH_GITHUB_ID;
+const githubClientSecret = process.env.GITHUB_CLIENT_SECRET || process.env.AUTH_GITHUB_SECRET;
+const googleClientId = process.env.GOOGLE_CLIENT_ID || process.env.AUTH_GOOGLE_ID;
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET || process.env.AUTH_GOOGLE_SECRET;
+
+const socialProvidersConfig: Record<string, { clientId: string; clientSecret: string; enabled: boolean }> = {};
+if (githubClientId && githubClientSecret) {
+  socialProvidersConfig.github = {
+    clientId: githubClientId,
+    clientSecret: githubClientSecret,
+    enabled: true,
+  };
+}
+if (googleClientId && googleClientSecret) {
+  socialProvidersConfig.google = {
+    clientId: googleClientId,
+    clientSecret: googleClientSecret,
+    enabled: true,
+  };
+}
 
 export const auth = betterAuth({
   baseURL: CANONICAL_ISSUER,
@@ -40,18 +70,7 @@ export const auth = betterAuth({
       });
     },
   },
-  socialProviders: {
-    github: {
-      clientId: process.env.GITHUB_CLIENT_ID || process.env.AUTH_GITHUB_ID || "",
-      clientSecret: process.env.GITHUB_CLIENT_SECRET || process.env.AUTH_GITHUB_SECRET || "",
-      enabled: Boolean(process.env.GITHUB_CLIENT_ID || process.env.AUTH_GITHUB_ID),
-    },
-    google: {
-      clientId: process.env.GOOGLE_CLIENT_ID || process.env.AUTH_GOOGLE_ID || "",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || process.env.AUTH_GOOGLE_SECRET || "",
-      enabled: Boolean(process.env.GOOGLE_CLIENT_ID || process.env.AUTH_GOOGLE_ID),
-    },
-  },
+  socialProviders: socialProvidersConfig,
   account: {
     accountLinking: {
       enabled: true,

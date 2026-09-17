@@ -43,8 +43,10 @@ services:
       - key: AUTH_ALLOW_LOCAL_CIMD
         value: "false"
       - key: STASHI_EMAIL_PROVIDER
-        sync: false
-      - key: RESEND_API_KEY
+        value: "brevo"
+      - key: BREVO_API_KEY
         sync: false
       - key: EMAIL_FROM
         sync: false
+      - key: AUTH_REQUIRE_EMAIL_VERIFY
+        value: "false"
