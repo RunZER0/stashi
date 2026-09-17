@@ -10,7 +10,7 @@ import { secureFetchClientMetadataResource } from "./cimd-transport";
 import { getAllResourceIdentifiers, getAllSupportedScopes } from "./resources";
 
 const CANONICAL_ISSUER = process.env.BETTER_AUTH_URL || "https://auth.mystashi.online";
-const authSecret = process.env.BETTER_AUTH_SECRET || process.env.AUTH_SECRET || "stashi-development-secret-must-be-configured-in-prod-123456";
+const authSecret = process.env.BETTER_AUTH_SECRET || "stashi-development-secret-must-be-configured-in-prod-123456";
 
 export const auth = betterAuth({
   baseURL: CANONICAL_ISSUER,
