@@ -77,7 +77,7 @@ function SignInContent() {
           <p>Sign in to your Stashi account to manage PostgreSQL databases, credentials, and authorizations.</p>
 
           <div className="auth-signal" aria-hidden="true">
-            <span /> Canonical Auth · auth.mystashi.online
+            <span /> Canonical Auth · mystashi.online
           </div>
 
           {error && (

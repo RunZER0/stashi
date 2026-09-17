@@ -16,7 +16,7 @@ export async function OPTIONS() {
 export async function GET(request: Request) {
   const host = request.headers.get("host") || "";
   const isLocal = host.includes("localhost") || host.includes("127.0.0.1");
-  const issuer = isLocal ? `http://${host}` : process.env.BETTER_AUTH_URL || "https://auth.mystashi.online";
+  const issuer = isLocal ? `http://${host}` : process.env.BETTER_AUTH_URL || "https://mystashi.online";
 
   const metadata = getEmeraldProtectedResourceMetadata(issuer);
 

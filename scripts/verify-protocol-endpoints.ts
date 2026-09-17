@@ -22,7 +22,7 @@ async function verify() {
   console.log("   Userinfo Endpoint:", oidcData.userinfo_endpoint);
   console.log("   Code challenge methods:", oidcData.code_challenge_methods_supported);
 
-  if (oidcData.issuer !== "https://auth.mystashi.online") {
+  if (oidcData.issuer !== "https://mystashi.online") {
     throw new Error("Invalid OIDC issuer!");
   }
 

@@ -60,7 +60,7 @@ export async function GET(request: Request) {
   // Return challenge directing client to OAuth discovery
   const host = request.headers.get("host") || "";
   const isLocal = host.includes("localhost") || host.includes("127.0.0.1");
-  const issuer = isLocal ? `http://${host}` : process.env.BETTER_AUTH_URL || "https://auth.mystashi.online";
+  const issuer = isLocal ? `http://${host}` : process.env.BETTER_AUTH_URL || "https://mystashi.online";
 
   const challenge = getWwwAuthenticateHeader({ issuer });
   return withCors(
@@ -80,7 +80,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request): Promise<Response> {
   const host = request.headers.get("host") || "";
   const isLocal = host.includes("localhost") || host.includes("127.0.0.1");
-  const issuer = isLocal ? `http://${host}` : process.env.BETTER_AUTH_URL || "https://auth.mystashi.online";
+  const issuer = isLocal ? `http://${host}` : process.env.BETTER_AUTH_URL || "https://mystashi.online";
 
   // Check for deprecated URL credentials and warn
   const url = new URL(request.url);

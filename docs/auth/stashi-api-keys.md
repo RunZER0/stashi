@@ -22,7 +22,7 @@ Stashi provides secure API keys for automated scripts, CLI commands, background 
 In the Stashi Console (**Account Settings → Account-Wide MCP**) or via API:
 
 ```bash
-curl -X POST https://auth.mystashi.online/api/account/keys \
+curl -X POST https://mystashi.online/api/account/keys \
   -H "Authorization: Bearer <YOUR_SESSION_OR_FULL_KEY>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -49,6 +49,6 @@ Response:
 ## Revoking an API Key
 
 ```bash
-curl -X DELETE https://auth.mystashi.online/api/account/keys/KEY_ID \
+curl -X DELETE https://mystashi.online/api/account/keys/KEY_ID \
   -H "Authorization: Bearer <SESSION_OR_PARENT_KEY>"
 ```

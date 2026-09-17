@@ -6,15 +6,15 @@ import { getAllSupportedScopes, getAllResourceIdentifiers } from "@/lib/auth/res
 
 describe("OAuth 2.1 & OpenID Connect Discovery", () => {
   it("serves valid OIDC discovery metadata with canonical issuer", async () => {
-    const req = new Request("https://auth.mystashi.online/.well-known/openid-configuration");
+    const req = new Request("https://mystashi.online/.well-known/openid-configuration");
     const res = await getOidcConfig(req);
     expect(res.status).toBe(200);
 
     const body = await res.json();
-    expect(body.issuer).toBe("https://auth.mystashi.online");
-    expect(body.authorization_endpoint).toBe("https://auth.mystashi.online/api/auth/oauth2/authorize");
-    expect(body.token_endpoint).toBe("https://auth.mystashi.online/api/auth/oauth2/token");
-    expect(body.jwks_uri).toBe("https://auth.mystashi.online/.well-known/jwks.json");
+    expect(body.issuer).toBe("https://mystashi.online");
+    expect(body.authorization_endpoint).toBe("https://mystashi.online/api/auth/oauth2/authorize");
+    expect(body.token_endpoint).toBe("https://mystashi.online/api/auth/oauth2/token");
+    expect(body.jwks_uri).toBe("https://mystashi.online/.well-known/jwks.json");
     expect(body.response_types_supported).toEqual(["code"]);
     expect(body.code_challenge_methods_supported).toContain("S256");
     expect(body.scopes_supported).toContain("openid");
@@ -23,12 +23,12 @@ describe("OAuth 2.1 & OpenID Connect Discovery", () => {
   });
 
   it("serves valid OAuth 2.1 authorization server metadata", async () => {
-    const req = new Request("https://auth.mystashi.online/.well-known/oauth-authorization-server");
+    const req = new Request("https://mystashi.online/.well-known/oauth-authorization-server");
     const res = await getOAuthConfig(req);
     expect(res.status).toBe(200);
 
     const body = await res.json();
-    expect(body.issuer).toBe("https://auth.mystashi.online");
+    expect(body.issuer).toBe("https://mystashi.online");
     expect(body.code_challenge_methods_supported).toEqual(["S256"]);
     expect(body.grant_types_supported).toContain("authorization_code");
     expect(body.grant_types_supported).toContain("refresh_token");

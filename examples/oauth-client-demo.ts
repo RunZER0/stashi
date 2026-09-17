@@ -6,7 +6,7 @@
 
 import { createHash, randomBytes } from "node:crypto";
 
-const STASHI_AUTH_ISSUER = process.env.STASHI_AUTH_URL || "https://auth.mystashi.online";
+const STASHI_AUTH_ISSUER = process.env.STASHI_AUTH_URL || "https://mystashi.online";
 const EMERALD_MCP_RESOURCE = "https://emerald.ynai.co.ke/mcp";
 
 interface OidcDiscovery {

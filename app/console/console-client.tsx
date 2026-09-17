@@ -1136,7 +1136,7 @@ function OAuthClientsPanel({
       </div>
       <p className="panel-footnote" style={{ marginTop: 0, paddingTop: 0, borderTop: "none" }}>
         Register OAuth 2.1 client applications to authorize external web services, desktop tools, and MCP servers via
-        PKCE or client credentials against <code>https://auth.mystashi.online</code>.
+        PKCE or client credentials against <code>https://mystashi.online</code>.
       </p>
 
       {secretNotice && (

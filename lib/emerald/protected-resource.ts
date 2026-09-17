@@ -31,7 +31,7 @@ export function getEmeraldProtectedResourceMetadata(issuer: string) {
     authorization_servers: [issuer],
     scopes_supported: ["openid", "profile", "email", "emerald:search", "emerald:read"],
     bearer_methods_supported: ["header"],
-    resource_documentation: "https://auth.mystashi.online/docs/auth/protect-an-mcp-server",
+    resource_documentation: "https://mystashi.online/docs/auth/protect-an-mcp-server",
   };
 }
 

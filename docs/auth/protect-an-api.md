@@ -7,14 +7,14 @@ Resource servers can protect their API routes by validating Stashi Auth access t
 Stashi tokens are cryptographically signed using asymmetric key pairs (`EdDSA` / `ES256`). Public keys are exposed at:
 
 ```text
-https://auth.mystashi.online/.well-known/jwks.json
+https://mystashi.online/.well-known/jwks.json
 ```
 
 ## Validation Checklist
 
 A secure protected resource MUST verify:
 1. **Signature**: Cryptographically verify against Stashi Auth's JWKS.
-2. **Issuer (`iss`)**: Must equal `https://auth.mystashi.online`.
+2. **Issuer (`iss`)**: Must equal `https://mystashi.online`.
 3. **Audience / Resource (`aud` or `resource`)**: Must match your resource URI.
 4. **Expiration (`exp`)**: Reject tokens where `exp < current_time`.
 5. **Required Scopes (`scope`)**: Check that the token grants the specific capability needed for the endpoint.
@@ -28,8 +28,8 @@ Using the standard `jose` library:
 ```ts
 import { createRemoteJWKSet, jwtVerify } from "jose";
 
-const ISSUER = "https://auth.mystashi.online";
-const JWKS_URL = new URL("https://auth.mystashi.online/.well-known/jwks.json");
+const ISSUER = "https://mystashi.online";
+const JWKS_URL = new URL("https://mystashi.online/.well-known/jwks.json");
 const EXPECTED_RESOURCE = "https://api.my-service.com";
 
 // Cached JWKS set with rotation support

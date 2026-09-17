@@ -49,7 +49,7 @@ describe("Rate Limiting", () => {
 
 describe("Security Email Templates", () => {
   it("generates verification email containing single-use link", () => {
-    const testUrl = "https://auth.mystashi.online/verify-email?token=sec_token_123";
+    const testUrl = "https://mystashi.online/verify-email?token=sec_token_123";
     const email = renderVerificationEmail(testUrl);
 
     expect(email.subject).toContain("Verify");
@@ -58,7 +58,7 @@ describe("Security Email Templates", () => {
   });
 
   it("generates password reset email with 15-minute expiration notice", () => {
-    const testUrl = "https://auth.mystashi.online/reset-password?token=pwd_token_456";
+    const testUrl = "https://mystashi.online/reset-password?token=pwd_token_456";
     const email = renderPasswordResetEmail(testUrl);
 
     expect(email.subject).toContain("Reset your Stashi password");

@@ -17,7 +17,7 @@ Emerald replies with 401 + WWW-Authenticate
     │
     │ Client reads /.well-known/oauth-protected-resource
     ▼
-Client discovers https://auth.mystashi.online
+Client discovers https://mystashi.online
     │
     │ Client identifies via CIMD (Client ID Metadata Document)
     ▼
@@ -41,7 +41,7 @@ Expose `/.well-known/oauth-protected-resource`:
 {
   "resource": "https://emerald.ynai.co.ke/mcp",
   "authorization_servers": [
-    "https://auth.mystashi.online"
+    "https://mystashi.online"
   ],
   "scopes_supported": [
     "openid",
@@ -62,7 +62,7 @@ When an unauthenticated request arrives at `/mcp`:
 
 ```http
 HTTP/1.1 401 Unauthorized
-WWW-Authenticate: Bearer realm="Emerald MCP", resource="https://emerald.ynai.co.ke/mcp", authorization_server="https://auth.mystashi.online"
+WWW-Authenticate: Bearer realm="Emerald MCP", resource="https://emerald.ynai.co.ke/mcp", authorization_server="https://mystashi.online"
 Content-Type: application/json
 
 {
@@ -93,7 +93,7 @@ The MCP server validates incoming tokens using Stashi Auth's JWKS:
 import { verifyEmeraldToken } from "@/lib/emerald/protected-resource";
 
 const result = await verifyEmeraldToken(token, {
-  issuer: "https://auth.mystashi.online",
+  issuer: "https://mystashi.online",
   requiredScope: "emerald:search",
 });
 

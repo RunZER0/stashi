@@ -1,18 +1,18 @@
 # Use Stashi as your OAuth 2.1 / OIDC Provider
 
-Stashi Auth (`https://auth.mystashi.online`) operates as a standards-compliant OAuth 2.1 and OpenID Connect (OIDC) identity and authorization server.
+Stashi Auth (`https://mystashi.online`) operates as a standards-compliant OAuth 2.1 and OpenID Connect (OIDC) identity and authorization server.
 
 ## Endpoints and Discovery
 
-* **Issuer**: `https://auth.mystashi.online`
-* **OIDC Discovery**: `https://auth.mystashi.online/.well-known/openid-configuration`
-* **OAuth 2.1 Discovery**: `https://auth.mystashi.online/.well-known/oauth-authorization-server`
-* **JWKS**: `https://auth.mystashi.online/.well-known/jwks.json`
-* **Authorization**: `https://auth.mystashi.online/api/auth/oauth2/authorize`
-* **Token Exchange & Refresh**: `https://auth.mystashi.online/api/auth/oauth2/token`
-* **User Profile & Claims (UserInfo)**: `https://auth.mystashi.online/api/auth/oauth2/userinfo`
-* **Token Introspection**: `https://auth.mystashi.online/api/auth/oauth2/introspect`
-* **Token Revocation**: `https://auth.mystashi.online/api/auth/oauth2/revoke`
+* **Issuer**: `https://mystashi.online`
+* **OIDC Discovery**: `https://mystashi.online/.well-known/openid-configuration`
+* **OAuth 2.1 Discovery**: `https://mystashi.online/.well-known/oauth-authorization-server`
+* **JWKS**: `https://mystashi.online/.well-known/jwks.json`
+* **Authorization**: `https://mystashi.online/api/auth/oauth2/authorize`
+* **Token Exchange & Refresh**: `https://mystashi.online/api/auth/oauth2/token`
+* **User Profile & Claims (UserInfo)**: `https://mystashi.online/api/auth/oauth2/userinfo`
+* **Token Introspection**: `https://mystashi.online/api/auth/oauth2/introspect`
+* **Token Revocation**: `https://mystashi.online/api/auth/oauth2/revoke`
 
 ---
 
@@ -45,7 +45,7 @@ const state = randomBytes(16).toString("base64url");
 ### Direct the User to Authorize
 
 ```text
-https://auth.mystashi.online/api/auth/oauth2/authorize
+https://mystashi.online/api/auth/oauth2/authorize
   ?response_type=code
   &client_id=YOUR_CLIENT_ID
   &redirect_uri=https://my-app.com/callback
@@ -63,7 +63,7 @@ https://auth.mystashi.online/api/auth/oauth2/authorize
 Upon redirect to your callback URI with `?code=...&state=...`:
 
 ```bash
-curl -X POST https://auth.mystashi.online/api/auth/oauth2/token \
+curl -X POST https://mystashi.online/api/auth/oauth2/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "grant_type=authorization_code" \
   -d "client_id=YOUR_CLIENT_ID" \
@@ -91,7 +91,7 @@ Response:
 Refresh tokens automatically rotate on each use:
 
 ```bash
-curl -X POST https://auth.mystashi.online/api/auth/oauth2/token \
+curl -X POST https://mystashi.online/api/auth/oauth2/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "grant_type=refresh_token" \
   -d "client_id=YOUR_CLIENT_ID" \
@@ -103,7 +103,7 @@ curl -X POST https://auth.mystashi.online/api/auth/oauth2/token \
 ## 5. Revoking Tokens
 
 ```bash
-curl -X POST https://auth.mystashi.online/api/auth/oauth2/revoke \
+curl -X POST https://mystashi.online/api/auth/oauth2/revoke \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "client_id=YOUR_CLIENT_ID" \
   -d "token=TOKEN_TO_REVOKE"

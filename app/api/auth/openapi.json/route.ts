@@ -12,7 +12,7 @@ export async function GET() {
     },
     servers: [
       {
-        url: "https://auth.mystashi.online",
+        url: "https://mystashi.online",
         description: "Canonical Production Authorization Server",
       },
     ],

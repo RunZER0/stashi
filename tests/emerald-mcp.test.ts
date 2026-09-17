@@ -12,7 +12,7 @@ describe("Emerald MCP Protected Resource Server", () => {
 
     const body = await res.json();
     expect(body.resource).toBe("https://emerald.ynai.co.ke/mcp");
-    expect(body.authorization_servers).toContain("https://auth.mystashi.online");
+    expect(body.authorization_servers).toContain("https://mystashi.online");
     expect(body.scopes_supported).toContain("emerald:search");
     expect(body.scopes_supported).toContain("emerald:read");
   });
@@ -43,7 +43,7 @@ describe("Emerald MCP Protected Resource Server", () => {
 
 describe("Emerald Token Cryptographic & Scope Verification", () => {
   it("verifies signature, audience, expiration, and scopes", async () => {
-    const issuer = "https://auth.mystashi.online";
+    const issuer = "https://mystashi.online";
     // Generate an in-memory signing keypair
     const { privateKey, publicKey } = await generateKeyPair("EdDSA", { extractable: true });
     const jwk = await exportJWK(publicKey);

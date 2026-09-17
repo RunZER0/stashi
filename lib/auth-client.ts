@@ -5,7 +5,7 @@ export const authClient = createAuthClient({
   baseURL:
     typeof window !== "undefined"
       ? window.location.origin
-      : process.env.NEXT_PUBLIC_AUTH_URL || process.env.BETTER_AUTH_URL || "https://auth.mystashi.online",
+      : process.env.NEXT_PUBLIC_AUTH_URL || process.env.BETTER_AUTH_URL || "https://mystashi.online",
   plugins: [oauthProviderClient()],
 });
 

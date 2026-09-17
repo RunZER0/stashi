@@ -9,7 +9,7 @@ import { logAuditEvent } from "./audit";
 import { secureFetchClientMetadataResource } from "./cimd-transport";
 import { getAllResourceIdentifiers, getAllSupportedScopes } from "./resources";
 
-const CANONICAL_ISSUER = process.env.BETTER_AUTH_URL || "https://auth.mystashi.online";
+const CANONICAL_ISSUER = process.env.BETTER_AUTH_URL || "https://mystashi.online";
 const authSecret = process.env.BETTER_AUTH_SECRET || "stashi-development-secret-must-be-configured-in-prod-123456";
 
 export const auth = betterAuth({
