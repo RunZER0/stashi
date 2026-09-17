@@ -473,6 +473,8 @@
   color: #f5f4f6;
 }
 .mk-footer {
+  position: relative;
+  z-index: 2;
   border-top: 1px solid rgba(86, 160, 255, .38);
   padding: 48px 0 54px;
   background: linear-gradient(105deg, #070b12 0%, #060607 52%, #090c13 100%);

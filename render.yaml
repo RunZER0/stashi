@@ -10,6 +10,10 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: BETTER_AUTH_URL
+        value: https://mystashi.online
+      - key: BETTER_AUTH_SECRET
+        sync: false
       - key: NEXT_PUBLIC_DB_HOST
         sync: false
       - key: NEXT_PUBLIC_DB_PORT
@@ -26,8 +30,6 @@ services:
         sync: false
       - key: BACKUP_BUCKET
         sync: false
-      - key: AUTH_SECRET
-        sync: false
       - key: AUTH_GITHUB_ID
         sync: false
       - key: AUTH_GITHUB_SECRET
@@ -36,3 +38,15 @@ services:
         sync: false
       - key: AUTH_GOOGLE_SECRET
         sync: false
+      - key: AUTH_ENABLE_LEGACY_DCR
+        value: "false"
+      - key: AUTH_ALLOW_LOCAL_CIMD
+        value: "false"
+      - key: STASHI_EMAIL_PROVIDER
+        value: "brevo"
+      - key: BREVO_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: AUTH_REQUIRE_EMAIL_VERIFY
+        value: "false"
