@@ -31,7 +31,7 @@ export default function Home() {
         <div className={styles.heroCopy}>
           <span className={styles.kicker}>Managed PostgreSQL with room to grow</span>
           <h1>Build with speed.<br />Operate with certainty.</h1>
-          <p>Stashi is the clear, dependable Postgres foundation for applications, teams, and automated workflows—with fixed plans, scoped keys, audit visibility, and recovery built in.</p>
+          <p>Stashi is the clear, dependable Postgres foundation for applications, teams, and automated workflows.</p>
           <div className={styles.actions}>
             <Link className="mk-button mk-button-dark" href="/login">Start with Stashi <ArrowRight size={16} /></Link>
             <Link className="mk-button mk-button-quiet" href="#how-it-works">See how it works</Link>
