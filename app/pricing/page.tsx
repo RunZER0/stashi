@@ -25,7 +25,7 @@ export default function PricingPage() {
           </span>
           <h1>Predictable plans. Clear headroom.</h1>
           <p>
-            Choose the capacity you need now. Storage, connection limits, and backup retention are shown upfront with the price, so you can grow an application without guessing what the next bill will be.
+            Stashi is the clear, dependable Postgres foundation for applications, teams, and automated workflows—with fixed plans, scoped keys, audit visibility, and recovery built in.
           </p>
         </div>
         <div className={styles.pricingPhoto}>
