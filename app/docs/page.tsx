@@ -69,39 +69,28 @@ export default function DocsPage() {
               <code>search_memory</code>.
             </p>
 
-            <h2 id="mcp-remote">Remote MCP (ChatGPT and other HTTP-only clients)</h2>
+            <h2 id="mcp-remote">Remote MCP (HTTP-based clients)</h2>
             <p>
-              The config above spawns a local process — that works for Claude Desktop, Cursor, and Windsurf,
-              but ChatGPT&rsquo;s Developer Mode connectors (and anything else that can&rsquo;t run a command on
-              your machine) need a public HTTPS endpoint instead. Same nine tools, same auth model, over
-              MCP&rsquo;s Streamable HTTP transport. Two variants, depending on what the client supports:
+              For remote clients and webhooks that connect over public HTTPS, Stashi provides an MCP endpoint using the Streamable HTTP transport. Two authentication options are supported:
             </p>
-            <pre style={codeBlockStyle}>{`Custom-header clients:
+            <pre style={codeBlockStyle}>{`Header-based authentication:
 URL:   https://www.mystashi.online/mcp
 Auth:  Authorization: Bearer <your STASHI_API_KEY>
 
-ChatGPT ("New Plugin" only offers No Auth or OAuth — no header field):
+URL-based authentication (e.g. ChatGPT Developer mode):
 URL:   https://www.mystashi.online/mcp/<your STASHI_API_KEY>
-Auth:  leave set to "No Auth" — the key in the URL is the credential`}</pre>
+Auth:  None (the key in the URL serves as the credential)`}</pre>
             <p>
-              In ChatGPT: Settings → Security and login → turn on Developer mode, then Plugins → + → paste
-              the second URL under Connection, leave Authentication on &ldquo;No Auth,&rdquo; and create. Both
-              URLs are also on your console&rsquo;s Agent &amp; MCP tab, under &ldquo;ChatGPT &amp; other remote
-              connectors.&rdquo; The endpoint is stateless — it resolves which database a request is scoped to
-              from whichever key it finds (header first, then the URL) on every call, so there&rsquo;s nothing
-              else to configure. Treat the key-in-URL form like any other copy of your API key: whoever has it
-              can act as that database.
+              In ChatGPT: Settings → Security and login → Developer mode, then Plugins → + → paste the URL and select &ldquo;No Auth.&rdquo;
+              Both URLs are also available on your database&rsquo;s Agent &amp; MCP tab in the console. The endpoint automatically resolves the target database from the provided key on every call.
             </p>
 
             <h2 id="mcp-account">Account-wide MCP (multiple databases, one connection)</h2>
             <p>
-              Everything above is scoped to one database — a separate connector per database, whichever
-              transport you use. An account key instead reaches every database you own through a single
-              connection. Create one from any database&rsquo;s Agent &amp; MCP tab, under &ldquo;Connect once,
-              reach every database&rdquo;:
+              An account key reaches every database you own through a single connection. Generate one from your database&rsquo;s Agent &amp; MCP tab under &ldquo;Connect once, reach every database&rdquo;:
             </p>
             <pre style={codeBlockStyle}>{`URL:   https://www.mystashi.online/mcp/<your account key>
-Auth:  leave set to "No Auth" in ChatGPT — same as the single-database form`}</pre>
+Auth:  None (the key in the URL serves as the credential)`}</pre>
             <p>
               The tool set gains a tenth tool, <code>list_databases</code> (id, name, plan, status, region for
               everything on the account), and the other nine each take a required <code>databaseId</code>{" "}

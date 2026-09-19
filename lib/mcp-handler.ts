@@ -6,16 +6,11 @@ import { registerAccountTools, registerDatabaseTools } from "@/lib/mcp-tools";
 
 // Shared implementation behind both MCP routes:
 //   app/mcp/route.ts            -- Authorization: Bearer <key> header
-//   app/mcp/[apiKey]/route.ts   -- key embedded in the URL path instead
+//   app/mcp/[apiKey]/route.ts   -- key embedded in the URL path
 //
-// The second one exists because ChatGPT's "New Plugin" connector dialog
-// only offers "No Auth" or "OAuth" -- there's no field for a static
-// Bearer/API-key header at all. With "No Auth" selected it sends every
-// request with no Authorization header whatsoever, so the only way to
-// identify which database a request is for is to put the key in the URL
-// itself, the same way a webhook secret would be. Both routes end up
-// here with whatever key they found; the header takes priority if both
-// happen to be present.
+// The URL-based route enables clients that do not support custom request headers
+// to authenticate via the path. Both routes forward to this handler, with the
+// Authorization header taking precedence if both are present.
 
 // ChatGPT's connector-creation step (and likely the tool-call path too, at
 // least in part) runs as a direct browser fetch from chatgpt.com to this

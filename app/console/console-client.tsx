@@ -850,12 +850,9 @@ function AgentPanel({
               </button>
             </div>
             <p className="panel-footnote">
-              In ChatGPT: Settings → Security and login → turn on Developer mode, then Plugins → + → paste
-              this URL under Connection, leave Authentication on &ldquo;No Auth,&rdquo; and create — it carries
-              your key itself, the same way a webhook secret would. In Claude or any client that takes a
-              custom header instead, use <code>{mcpUrl}</code> with{" "}
-              <code>Authorization: Bearer {"<your API key>"}</code>. Either form reaches this same database;
-              treat both like the key they contain.
+              In ChatGPT: Settings → Security and login → Developer mode, then Plugins → + → paste
+              this URL under Connection and select &ldquo;No Auth.&rdquo; For clients supporting custom headers, use <code>{mcpUrl}</code> with{" "}
+              <code>Authorization: Bearer {"<your API key>"}</code>. Both endpoints securely authenticate with this database.
             </p>
           </>
         )}
