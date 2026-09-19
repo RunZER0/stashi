@@ -86,10 +86,6 @@ export default function SignUpPage() {
           <h1>Get started with Stashi.</h1>
           <p>Create your developer identity for PostgreSQL databases, MCP integrations, and machine agents.</p>
 
-          <div className="auth-signal" aria-hidden="true">
-            <span /> One identity · Full control
-          </div>
-
           {error && (
             <div
               style={{
