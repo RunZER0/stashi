@@ -1,19 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { ArrowLeft, Github, AlertCircle, CheckCircle2 } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ArrowLeft, Github, AlertCircle, CheckCircle2, ChevronDown } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { AmbientVideoBackground } from "@/components/ambient-video-background";
 
-export default function SignUpPage() {
+function SignUpContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const errorParam = searchParams.get("error");
+  const errorDescParam = searchParams.get("error_description");
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [showEmailForm, setShowEmailForm] = useState(false);
+  const [error, setError] = useState<string | null>(() => {
+    if (!errorParam) return null;
+    if (errorParam === "access_denied") return "Sign-up was cancelled.";
+    if (errorParam.includes("state")) return "Sign-up session expired or was cancelled. Please try again.";
+    return errorDescParam || "Could not complete sign-up. Please try again.";
+  });
   const [verificationPending, setVerificationPending] = useState(false);
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -61,9 +71,15 @@ export default function SignUpPage() {
       const res = await authClient.signIn.social({
         provider,
         callbackURL: "/console",
+        errorCallbackURL: "/sign-up",
       });
       if (res?.error) {
-        setError(res.error.message || `Failed to sign up with ${provider}.`);
+        const msg = res.error.message?.toLowerCase() || "";
+        if (msg.includes("denied") || msg.includes("cancel")) {
+          setError("Sign-up was cancelled.");
+        } else {
+          setError(res.error.message || `Failed to sign up with ${provider}.`);
+        }
         setLoading(false);
         return;
       }
@@ -148,55 +164,83 @@ export default function SignUpPage() {
                 </button>
               </div>
 
-              <div style={{ display: "flex", alignItems: "center", gap: "12px", margin: "20px 0 16px" }}>
-                <div style={{ flex: 1, height: "1px", background: "rgba(68, 68, 81, 0.5)" }} />
-                <span style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".08em" }}>
-                  or with email
-                </span>
-                <div style={{ flex: 1, height: "1px", background: "rgba(68, 68, 81, 0.5)" }} />
+              <div style={{ marginTop: "20px" }}>
+                <button
+                  type="button"
+                  onClick={() => setShowEmailForm((prev) => !prev)}
+                  style={{
+                    width: "100%",
+                    background: "transparent",
+                    border: "none",
+                    padding: "8px 0",
+                    color: "var(--muted)",
+                    fontSize: "12px",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "8px",
+                    letterSpacing: ".04em",
+                  }}
+                >
+                  <div style={{ flex: 1, height: "1px", background: "rgba(68, 68, 81, 0.4)" }} />
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                    {showEmailForm ? "hide email registration" : "or continue with email"}
+                    <ChevronDown
+                      size={14}
+                      style={{
+                        transform: showEmailForm ? "rotate(180deg)" : "rotate(0deg)",
+                        transition: "transform 0.2s ease",
+                      }}
+                    />
+                  </span>
+                  <div style={{ flex: 1, height: "1px", background: "rgba(68, 68, 81, 0.4)" }} />
+                </button>
               </div>
 
-              <form onSubmit={handleSignUp} className="auth-form" style={{ marginTop: 0 }}>
-                <label>
-                  Full name
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Ada Lovelace"
-                    required
-                    autoComplete="name"
-                  />
-                </label>
+              {showEmailForm && (
+                <form onSubmit={handleSignUp} className="auth-form" style={{ marginTop: "16px" }}>
+                  <label>
+                    Full name
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Ada Lovelace"
+                      required
+                      autoComplete="name"
+                    />
+                  </label>
 
-                <label>
-                  Email address
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="name@example.com"
-                    required
-                    autoComplete="email"
-                  />
-                </label>
+                  <label>
+                    Email address
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="name@example.com"
+                      required
+                      autoComplete="email"
+                    />
+                  </label>
 
-                <label>
-                  Password (min. 8 characters)
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    required
-                    autoComplete="new-password"
-                  />
-                </label>
+                  <label>
+                    Password (min. 8 characters)
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      required
+                      autoComplete="new-password"
+                    />
+                  </label>
 
-                <button className="button button-dark" type="submit" disabled={loading} style={{ width: "100%", marginTop: "8px" }}>
-                  {loading ? "Creating account..." : "Create account"}
-                </button>
-              </form>
+                  <button className="button button-dark" type="submit" disabled={loading} style={{ width: "100%", marginTop: "8px" }}>
+                    {loading ? "Creating account..." : "Create account"}
+                  </button>
+                </form>
+              )}
 
               <div style={{ marginTop: "24px", paddingTop: "16px", borderTop: "1px solid rgba(68, 68, 81, 0.4)", display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--muted)" }}>
                 <span>Already have an account?</span>
@@ -213,6 +257,20 @@ export default function SignUpPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+export default function SignUpPage() {
+  return (
+    <Suspense
+      fallback={
+        <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#05070a", color: "#8a99a8" }}>
+          Loading sign up...
+        </div>
+      }
+    >
+      <SignUpContent />
+    </Suspense>
   );
 }
 

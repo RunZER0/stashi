@@ -53,6 +53,9 @@ export const auth = betterAuth({
     "https://www.mystashi.online",
     ...(process.env.NODE_ENV !== "production" ? ["http://localhost:3000"] : []),
   ],
+  onAPIError: {
+    errorURL: "/sign-in",
+  },
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: process.env.NODE_ENV === "production" && process.env.AUTH_REQUIRE_EMAIL_VERIFY === "true",

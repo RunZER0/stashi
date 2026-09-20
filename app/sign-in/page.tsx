@@ -3,7 +3,7 @@
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Github, Lock, Mail, AlertCircle } from "lucide-react";
+import { ArrowLeft, Github, Lock, Mail, AlertCircle, ChevronDown } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { AmbientVideoBackground } from "@/components/ambient-video-background";
 
@@ -11,11 +11,19 @@ function SignInContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirectTo") || "/console";
+  const errorParam = searchParams.get("error");
+  const errorDescParam = searchParams.get("error_description");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [showEmailForm, setShowEmailForm] = useState(false);
+  const [error, setError] = useState<string | null>(() => {
+    if (!errorParam) return null;
+    if (errorParam === "access_denied") return "Sign-in was cancelled.";
+    if (errorParam.includes("state")) return "Sign-in session expired or was cancelled. Please try again.";
+    return errorDescParam || "Could not complete sign-in. Please try again.";
+  });
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,9 +59,15 @@ function SignInContent() {
       const res = await authClient.signIn.social({
         provider,
         callbackURL: redirectTo,
+        errorCallbackURL: "/sign-in",
       });
       if (res?.error) {
-        setError(res.error.message || `Failed to sign in with ${provider}.`);
+        const msg = res.error.message?.toLowerCase() || "";
+        if (msg.includes("denied") || msg.includes("cancel")) {
+          setError("Sign-in was cancelled.");
+        } else {
+          setError(res.error.message || `Failed to sign in with ${provider}.`);
+        }
         setLoading(false);
         return;
       }
@@ -125,52 +139,80 @@ function SignInContent() {
             </button>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "12px", margin: "20px 0 16px" }}>
-            <div style={{ flex: 1, height: "1px", background: "rgba(68, 68, 81, 0.5)" }} />
-            <span style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".08em" }}>
-              or with email
-            </span>
-            <div style={{ flex: 1, height: "1px", background: "rgba(68, 68, 81, 0.5)" }} />
+          <div style={{ marginTop: "20px" }}>
+            <button
+              type="button"
+              onClick={() => setShowEmailForm((prev) => !prev)}
+              style={{
+                width: "100%",
+                background: "transparent",
+                border: "none",
+                padding: "8px 0",
+                color: "var(--muted)",
+                fontSize: "12px",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+                letterSpacing: ".04em",
+              }}
+            >
+              <div style={{ flex: 1, height: "1px", background: "rgba(68, 68, 81, 0.4)" }} />
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                {showEmailForm ? "hide email sign-in" : "or continue with email"}
+                <ChevronDown
+                  size={14}
+                  style={{
+                    transform: showEmailForm ? "rotate(180deg)" : "rotate(0deg)",
+                    transition: "transform 0.2s ease",
+                  }}
+                />
+              </span>
+              <div style={{ flex: 1, height: "1px", background: "rgba(68, 68, 81, 0.4)" }} />
+            </button>
           </div>
 
-          <form onSubmit={handleEmailSignIn} className="auth-form" style={{ marginTop: 0 }}>
-            <label>
-              Email address
-              <div style={{ position: "relative" }}>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@example.com"
-                  required
-                  autoComplete="email"
-                />
-              </div>
-            </label>
+          {showEmailForm && (
+            <form onSubmit={handleEmailSignIn} className="auth-form" style={{ marginTop: "16px" }}>
+              <label>
+                Email address
+                <div style={{ position: "relative" }}>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="name@example.com"
+                    required
+                    autoComplete="email"
+                  />
+                </div>
+              </label>
 
-            <label>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span>Password</span>
-                <Link href="/forgot-password" style={{ fontSize: "11px", color: "#56a0ff" }}>
-                  Forgot?
-                </Link>
-              </div>
-              <div style={{ position: "relative" }}>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                  autoComplete="current-password"
-                />
-              </div>
-            </label>
+              <label>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>Password</span>
+                  <Link href="/forgot-password" style={{ fontSize: "11px", color: "#56a0ff" }}>
+                    Forgot?
+                  </Link>
+                </div>
+                <div style={{ position: "relative" }}>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                    autoComplete="current-password"
+                  />
+                </div>
+              </label>
 
-            <button className="button button-dark" type="submit" disabled={loading} style={{ width: "100%", marginTop: "8px" }}>
-              {loading ? "Signing in..." : "Sign in with Email"}
-            </button>
-          </form>
+              <button className="button button-dark" type="submit" disabled={loading} style={{ width: "100%", marginTop: "8px" }}>
+                {loading ? "Signing in..." : "Sign in with Email"}
+              </button>
+            </form>
+          )}
 
           <div style={{ marginTop: "24px", paddingTop: "16px", borderTop: "1px solid rgba(68, 68, 81, 0.4)", display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--muted)" }}>
             <span>Don't have an account?</span>
