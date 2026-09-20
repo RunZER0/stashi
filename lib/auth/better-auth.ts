@@ -26,7 +26,7 @@ const githubClientSecret = process.env.GITHUB_CLIENT_SECRET || process.env.AUTH_
 const googleClientId = process.env.GOOGLE_CLIENT_ID || process.env.AUTH_GOOGLE_ID;
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET || process.env.AUTH_GOOGLE_SECRET;
 
-const socialProvidersConfig: Record<string, { clientId: string; clientSecret: string; enabled: boolean }> = {};
+const socialProvidersConfig: Record<string, any> = {};
 if (githubClientId && githubClientSecret) {
   socialProvidersConfig.github = {
     clientId: githubClientId,
@@ -39,6 +39,8 @@ if (googleClientId && googleClientSecret) {
     clientId: googleClientId,
     clientSecret: googleClientSecret,
     enabled: true,
+    prompt: "select_account consent",
+    accessType: "offline",
   };
 }
 
@@ -46,6 +48,11 @@ export const auth = betterAuth({
   baseURL: CANONICAL_ISSUER,
   secret: authSecret,
   database: getPool(),
+  trustedOrigins: [
+    "https://mystashi.online",
+    "https://www.mystashi.online",
+    ...(process.env.NODE_ENV !== "production" ? ["http://localhost:3000"] : []),
+  ],
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: process.env.NODE_ENV === "production" && process.env.AUTH_REQUIRE_EMAIL_VERIFY === "true",

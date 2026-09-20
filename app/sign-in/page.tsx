@@ -48,12 +48,21 @@ function SignInContent() {
     setLoading(true);
     setError(null);
     try {
-      await authClient.signIn.social({
+      const res = await authClient.signIn.social({
         provider,
         callbackURL: redirectTo,
       });
-    } catch {
-      setError(`Failed to sign in with ${provider}.`);
+      if (res?.error) {
+        setError(res.error.message || `Failed to sign in with ${provider}.`);
+        setLoading(false);
+        return;
+      }
+      if (res?.data?.url) {
+        window.location.href = res.data.url;
+        return;
+      }
+    } catch (err: any) {
+      setError(err?.message || `Failed to sign in with ${provider}.`);
       setLoading(false);
     }
   };
