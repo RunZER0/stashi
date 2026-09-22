@@ -42,7 +42,7 @@ npm run build
 
 ## Infrastructure model
 
-Database nodes run PostgreSQL 17 behind PgBouncer. Public database connections require TLS. Shared plans use separate databases and roles on managed nodes; dedicated plans reserve node capacity.
+Database nodes run PostgreSQL 17 behind PgBouncer, and public database connections require TLS. Dev databases are schema-isolated inside a shared PostgreSQL pool, while Starter and Production use separate databases and roles on managed nodes. Dedicated plans reserve node capacity. Tenant applications should keep migrations schema-agnostic rather than hard-coding `public`; see the architecture and product docs for the pooled-schema model.
 
 The current repository contains the web control plane and a simulated provisioner. The node agent that performs PostgreSQL and PgBouncer changes is the next infrastructure component.
 
