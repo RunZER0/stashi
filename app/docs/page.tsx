@@ -33,6 +33,7 @@ export default function DocsPage() {
             <a href="#mcp-remote">Remote MCP (ChatGPT)</a><br />
             <a href="#mcp-account">Account-wide MCP</a><br />
             <a href="#query">Running a query</a><br />
+            <a href="#dev-schema">Dev plan schemas</a><br />
             <a href="#checkpoints">Checkpoints &amp; rollback</a><br />
             <a href="#keys">Scoped agent keys</a><br />
           </aside>
@@ -138,6 +139,40 @@ const res = await fetch(
   }
 );
 const { rows } = await res.json();`}</pre>
+
+            <h2 id="dev-schema">Dev plan schema isolation</h2>
+            <p>
+              Dev databases use a pooled tenancy model. Multiple Dev databases share the same physical
+              PostgreSQL database, but every tenant receives its own PostgreSQL role and its own schema.
+              Stashi sets that schema as the role&apos;s default <code>search_path</code>, so ordinary
+              unqualified SQL such as <code>CREATE TABLE users (...)</code> is created inside that tenant
+              schema automatically.
+            </p>
+            <p>
+              Applications on the Dev plan should avoid hard-coding the <code>public</code> schema in
+              migrations or ORM configuration. Statements such as <code>CREATE TABLE public.users (...)</code>
+              or <code>REFERENCES public.users(id)</code> bypass the tenant&apos;s assigned schema and will
+              normally fail with a permission error. This is expected and is part of Stashi&apos;s isolation
+              boundary.
+            </p>
+            <pre style={codeBlockStyle}>{`-- Portable across Stashi Dev and isolated plans
+CREATE TABLE users (
+  id uuid PRIMARY KEY,
+  email text NOT NULL UNIQUE
+);
+
+-- Avoid on pooled Dev databases
+CREATE TABLE public.users (
+  id uuid PRIMARY KEY,
+  email text NOT NULL UNIQUE
+);`}</pre>
+            <p>
+              Most ORMs work without changes when they emit unqualified table and type names. If your migration
+              tool generates explicit <code>public.</code> qualifiers, configure it to use the connection&apos;s
+              current schema or remove those qualifiers before applying migrations. Starter, Production and
+              Dedicated databases use isolated databases, but schema-agnostic migrations remain the recommended
+              approach because the same migration set can move between plans safely.
+            </p>
 
             <h2 id="checkpoints">Checkpoints &amp; rollback</h2>
             <p>

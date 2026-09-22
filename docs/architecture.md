@@ -4,7 +4,7 @@
 
 Each node runs PostgreSQL 17 and PgBouncer. PostgreSQL listens on a private interface. PgBouncer accepts client connections over TLS.
 
-Shared plans use separate PostgreSQL databases and roles on the same node. Dedicated plans reserve node capacity for one customer.
+The Dev plan uses pooled tenancy: tenants share the physical `stashi_pool` database but receive separate PostgreSQL roles and schemas. Each pooled role has its tenant schema configured as the database-level default `search_path`, and it does not receive `CREATE` privileges on `public`. Starter and Production plans use separate PostgreSQL databases and roles on shared nodes. Dedicated plans reserve node capacity for one customer.
 
 ## Control plane
 
@@ -59,3 +59,12 @@ Control-plane requests should be idempotent. Jobs need durable states so retries
 ## Billing
 
 Plans are fixed-price records with explicit storage, connection and retention limits. Usage metrics enforce those limits and support capacity planning. Billing does not derive a variable compute charge from runtime telemetry.
+
+
+## Application migration compatibility
+
+Tenant applications should use schema-agnostic migrations. Unqualified objects such as `CREATE TABLE users (...)` are resolved through the connection's configured `search_path` and therefore work on both pooled Dev databases and isolated databases.
+
+Applications should not assume that `public` is writable. On pooled Dev databases, explicit references such as `public.users`, `CREATE TYPE public.status`, or foreign keys targeting `public.<table>` cross the tenant schema boundary and are rejected by PostgreSQL permissions. This is intentional.
+
+ORMs and migration tools should be configured to emit unqualified object names or to target `current_schema()`. Stashi does not grant pooled tenant roles broader access to `public` to accommodate migration tools; the migration configuration must preserve the isolation model.
