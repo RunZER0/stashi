@@ -43,7 +43,7 @@ function SignInContent() {
       if (res.error) {
         setError(res.error.message || "Failed to sign in. Please check your credentials.");
       } else {
-        router.push(redirectTo);
+        window.location.href = redirectTo;
       }
     } catch {
       setError("An unexpected error occurred. Please try again.");

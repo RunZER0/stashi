@@ -54,7 +54,7 @@ function SignUpContent() {
         if (process.env.NEXT_PUBLIC_REQUIRE_VERIFY === "true") {
           setVerificationPending(true);
         } else {
-          router.push("/console");
+          window.location.href = "/console";
         }
       }
     } catch {

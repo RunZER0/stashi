@@ -5,6 +5,8 @@ import { adminSummary } from "@/lib/store";
 import { getPlan } from "@/lib/plans";
 import { auth } from "@/auth";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminPage() {
   const session = await auth();
   if (!session?.user?.email) redirect("/login");

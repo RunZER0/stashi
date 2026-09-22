@@ -91,6 +91,7 @@ export const auth = betterAuth({
     jwt({
       jwks: {
         jwksPath: "/jwks",
+        disablePrivateKeyEncryption: true,
         keyPairConfig: {
           alg: "EdDSA",
         },

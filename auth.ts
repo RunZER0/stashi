@@ -22,7 +22,11 @@ export async function auth(): Promise<StashiSession | null> {
       headers: reqHeaders,
     });
     if (session?.user?.email) {
-      await recordUserSeen(session.user.email);
+      try {
+        await recordUserSeen(session.user.email);
+      } catch (err) {
+        console.warn("[Stashi Auth] Non-blocking warning recording user seen:", err);
+      }
       return {
         user: {
           id: session.user.id,
@@ -32,8 +36,11 @@ export async function auth(): Promise<StashiSession | null> {
         },
       };
     }
-  } catch {
-    // Gracefully handle invocations outside of active HTTP request contexts
+  } catch (err: any) {
+    if (err?.digest === "DYNAMIC_SERVER_USAGE" || err?.digest?.startsWith?.("NEXT_REDIRECT")) {
+      throw err;
+    }
+    console.error("[Stashi Auth] Error resolving session:", err);
   }
   return null;
 }
