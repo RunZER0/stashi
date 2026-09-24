@@ -95,13 +95,36 @@ sudo -u postgres pg_restore -v -d ynai_restored -j 2 /tmp/ynai_restore.dump
 sudo -u postgres psql -d ynai_restored -c "ANALYZE; SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';"
 ```
 
-This path restores from a discrete logical `.dump` checkpoint and is best for restoring a single tenant/database to a known save point. It cannot recover to an arbitrary point in time between backups — for that, use Section 5.
+This path restores from a discrete logical `.dump` checkpoint and is best for restoring a single tenant/database to a known save point.
 
 ---
 
-## 5. Point-in-Time Recovery (pgBackRest)
+## 4b. Restoring from 6-Hour Automated B2 Snapshots
 
-Use this when the need is "restore to 3:47pm yesterday" rather than "restore to the last checkpoint." See `ops/runbook.md` Phase 7 for setup. **Never restore in place on the live cluster** — always restore to an isolated path first, verify, then only promote if this is an actual disaster-recovery event (not a drill).
+Automated 6-hour snapshots run via `stashi-snapshot.timer` and upload to Backblaze B2 (`s3://stashi-backups/snapshots/`), retaining a rolling 30-hour window (latest 5 snapshots) within B2 free tier allowances:
+
+```bash
+# 1. List available snapshots on B2
+AWS_ACCESS_KEY_ID=005c913bda736a00000000001 AWS_SECRET_ACCESS_KEY=<secret> AWS_DEFAULT_REGION=us-east-005 \
+  aws s3 ls s3://stashi-backups/snapshots/ --endpoint-url https://s3.us-east-005.backblazeb2.com
+
+# 2. Download the desired snapshot (if not already cached locally in /var/backups/stashi/snapshots/)
+aws s3 cp s3://stashi-backups/snapshots/ynai_YYYYMMDD_HHMMSS.dump /tmp/ynai_restore.dump \
+  --endpoint-url https://s3.us-east-005.backblazeb2.com
+
+# 3. Restore into database using pg_restore with parallelism
+sudo -u postgres pg_restore -v -d ynai_restored -j 2 /tmp/ynai_restore.dump
+```
+
+---
+
+## 5. Point-in-Time Recovery (pgBackRest) [Retired / Optional]
+
+> [!NOTE]
+> Continuous WAL archiving via pgBackRest was decommissioned in favor of the 6-hour snapshot system because continuous 16MB WAL streaming generated 2,400+ API requests/day, exhausting Backblaze B2's daily 2,500 Class B transaction cap and causing WAL retention bloat. If PITR is ever re-enabled, ensure Backblaze B2 transaction caps are set to paid/unlimited.
+
+See `ops/runbook.md` Phase 7 for setup. **Never restore in place on the live cluster** — always restore to an isolated path first, verify, then only promote if this is an actual disaster-recovery event (not a drill).
+
 
 ```bash
 # 1. Confirm backup history and available recovery window
