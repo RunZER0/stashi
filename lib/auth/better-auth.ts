@@ -9,7 +9,7 @@ import { logAuditEvent } from "./audit";
 import { secureFetchClientMetadataResource } from "./cimd-transport";
 import { getAllResourceIdentifiers, getAllSupportedScopes } from "./resources";
 
-const CANONICAL_ISSUER = process.env.BETTER_AUTH_URL || "https://mystashi.online";
+const CANONICAL_ISSUER = process.env.BETTER_AUTH_URL || "https://www.mystashi.online";
 
 // In production, BETTER_AUTH_SECRET is strictly mandatory and startup must fail if missing
 if (process.env.NODE_ENV === "production" && !process.env.BETTER_AUTH_SECRET) {

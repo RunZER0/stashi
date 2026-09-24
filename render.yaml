@@ -11,7 +11,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: BETTER_AUTH_URL
-        value: https://mystashi.online
+        value: https://www.mystashi.online
       - key: BETTER_AUTH_SECRET
         sync: false
       - key: NEXT_PUBLIC_DB_HOST
